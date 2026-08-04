@@ -31,3 +31,15 @@ def auto_enable_custom_integrations(enable_custom_integrations):
     way (config flow "domain not found") rather than a clear error.
     """
     yield
+
+
+@pytest.fixture(autouse=True)
+def auto_enable_sockets(socket_enabled):
+    """pytest-homeassistant-custom-component's own hass fixture calls
+    pytest_socket.disable_socket() directly, which a plain --allow-hosts
+    CLI option doesn't override -- the socket_enabled fixture is the
+    documented counter for tests (like ours) that intentionally need real
+    local network I/O against a real aiohttp server standing in for the
+    App.
+    """
+    yield
