@@ -46,3 +46,25 @@ jobs:
 
       - name: Run tests
         run: python -m pytest -q
+
+  test-full:
+    name: Full integration tests (real Home Assistant core)
+    runs-on: ubuntu-latest
+    # This is the one place Home Assistant core is installed for this
+    # project -- deliberately only here, in a GitHub-hosted cloud runner,
+    # never on a contributor's own machine (see tests_full/conftest.py).
+    # Covers everything tests/ structurally can't: the actual ConfigFlow,
+    # DataUpdateCoordinator, and entity platform classes.
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install test dependencies
+        run: pip install pytest-homeassistant-custom-component pytest-asyncio aiohttp
+
+      - name: Run full integration tests
+        working-directory: tests_full
+        run: python -m pytest -q
