@@ -22,17 +22,18 @@ renamed, or deleted.
 
 ## Testing
 
-This package is tested in two tiers, deliberately:
+This package is tested in three tiers, deliberately:
 
-- **`tests/`** (this repo, runs with plain `pytest` + `aiohttp` — no Home Assistant core installed) covers everything that doesn't subclass HA base classes: `pairing.py` (pairing-code decode), `sync.py` (the coordinator's add/remove diffing), and `api.py` (the HTTP/WS client, tested against a real local `aiohttp.web` server standing in for the App). Run with:
+- **`tests/`** (runs locally with plain `pytest` + `aiohttp` — no Home Assistant core installed) covers everything that doesn't subclass HA base classes: `pairing.py` (pairing-code decode), `sync.py` (the coordinator's add/remove diffing), and `api.py` (the HTTP/WS client, tested against a real local `aiohttp.web` server standing in for the App). Run with:
   ```
   python -m venv .venv-test
   .venv-test/Scripts/pip install aiohttp voluptuous pytest pytest-asyncio
   .venv-test/Scripts/pytest
   ```
-- **`__init__.py`, `config_flow.py`'s `ConfigFlow` class, `coordinator.py`'s `DataUpdateCoordinator` subclass, `entity.py`, `button.py`, `switch.py`** genuinely require Home Assistant core (they subclass its entity/coordinator/config-flow base classes) and are **not** unit-tested in this repo by design — this project deliberately does not install `homeassistant` locally. Verify these by installing the integration on a real Home Assistant instance (see above) and checking: the config flow accepts a valid pairing code and rejects an invalid one, entities appear grouped correctly per command, a dashboard button card fires a real transmit, the native "Button pressed" automation trigger fires, and the switch visibly toggles on then resets.
+- **`tests_full/`** covers everything `tests/` structurally can't: the real `ConfigFlow`, the `DataUpdateCoordinator` subclass, and the `button`/`switch` entity platforms, using [`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component) against real Home Assistant core. This only ever runs in GitHub Actions' cloud runners (see `.github/workflows/ci.yaml`'s `test-full` job) — **Home Assistant core is intentionally never installed on a contributor's own machine** for this project. It's not runnable locally by design; if you're making changes to `__init__.py`, `config_flow.py`, `coordinator.py`, `entity.py`, `button.py`, or `switch.py`, push to a branch/PR and let CI validate them, or install the integration on a real HA instance directly.
+- CI also runs [`hassfest`](https://developers.home-assistant.io/docs/creating_integration_manifest/#hassfest) and the [HACS validator](https://hacs.xyz/docs/publish/action/) against the manifest/structure on every push and PR.
 
-CI also runs [`hassfest`](https://developers.home-assistant.io/docs/creating_integration_manifest/#hassfest) and the [HACS validator](https://hacs.xyz/docs/publish/action/) against the manifest/structure on every push and PR, which catches real structural mistakes without needing HA core installed locally either.
+All four CI jobs are required status checks before anything can merge into `main`.
 
 ## Contributing
 
