@@ -52,13 +52,26 @@ class IrRfHubClient:
         ]
 
     async def async_fire_command(self, command_id: str) -> None:
-        async with self._session.post(f"{self._base_url}/commands/{command_id}/fire", headers=self._headers) as resp:
-            await self._raise_for_status(resp)
+        try:
+            async with self._session.post(
+                f"{self._base_url}/commands/{command_id}/fire", headers=self._headers
+            ) as resp:
+                await self._raise_for_status(resp)
+        except aiohttp.ClientError as exc:
+            # Covers connection-refused/DNS/timeout failures below the HTTP
+            # layer -- _raise_for_status only ever sees a response that
+            # actually arrived. Without this, a plain aiohttp.ClientError
+            # escapes uncaught past every `except IrRfHubApiError` in
+            # config_flow.py/button.py/switch.py.
+            raise IrRfHubApiError(str(exc)) from exc
 
     async def _get(self, path: str):
-        async with self._session.get(f"{self._base_url}{path}", headers=self._headers) as resp:
-            await self._raise_for_status(resp)
-            return await resp.json()
+        try:
+            async with self._session.get(f"{self._base_url}{path}", headers=self._headers) as resp:
+                await self._raise_for_status(resp)
+                return await resp.json()
+        except aiohttp.ClientError as exc:
+            raise IrRfHubApiError(str(exc)) from exc
 
     async def _raise_for_status(self, resp: aiohttp.ClientResponse) -> None:
         if resp.status == 401:

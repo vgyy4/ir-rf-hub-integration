@@ -8,36 +8,43 @@ real toggle state to both dashboards and automations.
 
 from __future__ import annotations
 
-import asyncio
-
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_call_later
 
 from .api import CommandRecord, IrRfHubApiError, IrRfHubAuthError
 from .const import DEFAULT_SWITCH_RESET_DELAY_S, DOMAIN
-from .coordinator import SIGNAL_COMMAND_ADDED, IrRfHubCoordinator
+from .coordinator import SIGNAL_COMMAND_ADDED, SIGNAL_COMMAND_REMOVED, IrRfHubCoordinator
 from .entity import IrRfHubCommandEntity
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: IrRfHubCoordinator = hass.data[DOMAIN][entry.entry_id]
-    added: set[str] = set()
+    entities: dict[str, IrRfHubSwitch] = {}
 
     @callback
     def _add_new(command: CommandRecord) -> None:
-        if command.id in added:
+        if command.id in entities:
             return
-        added.add(command.id)
-        async_add_entities([IrRfHubSwitch(coordinator, command.id)])
+        entity = IrRfHubSwitch(coordinator, command.id)
+        entities[command.id] = entity
+        async_add_entities([entity])
+
+    @callback
+    def _remove(command_id: str) -> None:
+        entity = entities.pop(command_id, None)
+        if entity is not None:
+            hass.async_create_task(entity.async_remove(force_remove=True))
 
     for command in coordinator.data.values():
         _add_new(command)
 
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_COMMAND_ADDED, _add_new))
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_COMMAND_REMOVED, _remove))
 
 
 class IrRfHubSwitch(IrRfHubCommandEntity, SwitchEntity):
@@ -59,7 +66,16 @@ class IrRfHubSwitch(IrRfHubCommandEntity, SwitchEntity):
 
         self._attr_is_on = True
         self.async_write_ha_state()
-        await asyncio.sleep(DEFAULT_SWITCH_RESET_DELAY_S)
+
+        # Scheduled as a detached callback, NOT awaited inline: a blocking
+        # service call (hass.services.async_call(..., blocking=True), which
+        # scripts/automations commonly use) would otherwise not return
+        # until the full reset delay elapsed, and the "on" state would
+        # never be observable to a caller awaiting that call at all.
+        async_call_later(self.hass, DEFAULT_SWITCH_RESET_DELAY_S, self._async_reset)
+
+    @callback
+    def _async_reset(self, _now) -> None:
         self._attr_is_on = False
         self.async_write_ha_state()
 

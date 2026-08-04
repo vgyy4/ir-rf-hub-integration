@@ -15,25 +15,33 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import CommandRecord, IrRfHubApiError, IrRfHubAuthError
 from .const import DOMAIN
-from .coordinator import SIGNAL_COMMAND_ADDED, IrRfHubCoordinator
+from .coordinator import SIGNAL_COMMAND_ADDED, SIGNAL_COMMAND_REMOVED, IrRfHubCoordinator
 from .entity import IrRfHubCommandEntity
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: IrRfHubCoordinator = hass.data[DOMAIN][entry.entry_id]
-    added: set[str] = set()
+    entities: dict[str, IrRfHubButton] = {}
 
     @callback
     def _add_new(command: CommandRecord) -> None:
-        if command.id in added:
+        if command.id in entities:
             return
-        added.add(command.id)
-        async_add_entities([IrRfHubButton(coordinator, command.id)])
+        entity = IrRfHubButton(coordinator, command.id)
+        entities[command.id] = entity
+        async_add_entities([entity])
+
+    @callback
+    def _remove(command_id: str) -> None:
+        entity = entities.pop(command_id, None)
+        if entity is not None:
+            hass.async_create_task(entity.async_remove(force_remove=True))
 
     for command in coordinator.data.values():
         _add_new(command)
 
     entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_COMMAND_ADDED, _add_new))
+    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_COMMAND_REMOVED, _remove))
 
 
 class IrRfHubButton(IrRfHubCommandEntity, ButtonEntity):
