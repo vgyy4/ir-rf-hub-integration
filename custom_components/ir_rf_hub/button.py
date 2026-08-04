@@ -10,6 +10,7 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -34,8 +35,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     @callback
     def _remove(command_id: str) -> None:
         entity = entities.pop(command_id, None)
-        if entity is not None:
-            hass.async_create_task(entity.async_remove(force_remove=True))
+        if entity is None or entity.entity_id is None:
+            return
+        # entity.async_remove() alone tears down the live entity/state but
+        # doesn't reliably purge the entity *registry* entry -- explicit
+        # registry removal is what actually makes a deleted command's
+        # entities disappear for good, not just go unavailable.
+        registry = er.async_get(hass)
+        if registry.async_get(entity.entity_id) is not None:
+            registry.async_remove(entity.entity_id)
 
     for command in coordinator.data.values():
         _add_new(command)
