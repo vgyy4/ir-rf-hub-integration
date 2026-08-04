@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to IR/RF Command Hub",
+        "description": "Open the IR/RF Command Hub App's Settings page in Home Assistant and copy the pairing code shown there.",
+        "data": {
+          "pairing_code": "Pairing code"
+        }
+      }
+    },
+    "error": {
+      "invalid_code": "That doesn't look like a valid pairing code. Copy it again from the App's Settings page.",
+      "invalid_auth": "The App rejected this pairing code. It may have been regenerated -- copy a fresh one.",
+      "cannot_connect": "Could not reach the App. Make sure it's running and try again."
+    },
+    "abort": {
+      "already_configured": "This App is already connected."
+    }
+  }
+}

@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *" # catches regressions from upstream hassfest/HACS changes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hassfest:
+    name: Validate with hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: Validate for HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # "brands" requires a separate submission to home-assistant/brands
+          # before this integration is published to the HACS default store;
+          # not something CI here can satisfy on its own.
+          ignore: "brands"
+
+  test:
+    name: Unit tests (no Home Assistant core installed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install test dependencies
+        run: pip install aiohttp voluptuous pytest pytest-asyncio
+
+      - name: Run tests
+        run: python -m pytest -q
