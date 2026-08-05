@@ -46,15 +46,18 @@ async def async_report_esphome_devices_forever(hass: HomeAssistant, client: IrRf
     automatically on unload) -- browse, report, sleep, repeat. Never lets
     a failed cycle kill the loop; just retries next interval.
     """
+    logger.info("ESPHome discovery: starting background browse (service %s, every %ss)", _SERVICE_TYPE, _BROWSE_INTERVAL_S)
     aiozc = await ha_zeroconf.async_get_async_instance(hass)
 
     while True:
         try:
             devices = await _browse_once(aiozc.zeroconf)
+            logger.debug("ESPHome discovery: browse cycle found %d device(s)", len(devices))
             if devices:
                 await client.async_report_discovered_devices(devices)
+                logger.info("ESPHome discovery: reported %d device(s) to the App", len(devices))
         except Exception:  # noqa: BLE001 -- background loop, one bad cycle shouldn't kill it
-            logger.debug("ESPHome discovery report cycle failed, will retry", exc_info=True)
+            logger.warning("ESPHome discovery report cycle failed, will retry", exc_info=True)
         await asyncio.sleep(_BROWSE_INTERVAL_S)
 
 
