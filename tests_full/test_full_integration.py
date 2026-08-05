@@ -143,16 +143,24 @@ async def test_config_flow_hassio_discovery_unreachable_aborts(hass):
 
 
 async def test_config_flow_hassio_discovery_already_configured_aborts(hass):
-    app = make_app("secret-token", commands=[])
-    async with TestServer(app) as server:
-        await _setup_entry(hass, server, "secret-token")
+    # _setup_entry() doesn't set unique_id (the other tests using it don't
+    # need duplicate-detection), so build the pre-existing entry directly
+    # with the same unique_id async_step_hassio derives (f"{host}:{port}"),
+    # and no need for a real fake server since the abort happens before
+    # any connectivity check.
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="127.0.0.1:9999",
+        data={"host": "127.0.0.1", "port": 9999, "token": "secret-token"},
+    )
+    entry.add_to_hass(hass)
 
-        discovery_info = _hassio_discovery(server.host, server.port, "secret-token")
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": "hassio"}, data=discovery_info
-        )
-        assert result["type"] is FlowResultType.ABORT
-        assert result["reason"] == "already_configured"
+    discovery_info = _hassio_discovery("127.0.0.1", 9999, "secret-token")
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "hassio"}, data=discovery_info
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
 
 
 # -- entity setup ---------------------------------------------------------------
