@@ -8,6 +8,7 @@ the user's computer.
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -42,4 +43,34 @@ def auto_enable_sockets(socket_enabled):
     local network I/O against a real aiohttp server standing in for the
     App.
     """
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _no_real_esphome_discovery_task(monkeypatch: pytest.MonkeyPatch):
+    """__init__.py's async_setup_entry unconditionally starts a
+    background task that constructs a real Zeroconf instance and does
+    real mDNS I/O (esphome_discovery.async_report_esphome_devices_forever)
+    -- every test that sets up the config entry via _setup_entry() would
+    otherwise trigger it for real, including the ~10 entity/config-flow
+    tests that have nothing to do with ESPHome discovery. That real
+    Zeroconf construction (blocked by this suite's socket restrictions
+    to 127.0.0.1/::1 -- see auto_enable_sockets above) was corrupting the
+    event loop badly enough to crash *later* tests' teardown with
+    "RuntimeError: Event loop is closed", confirmed by CI.
+
+    Patched at the custom_components.ir_rf_hub (i.e. __init__.py) level,
+    not on esphome_discovery itself -- `from .esphome_discovery import
+    async_report_esphome_devices_forever` already bound the name into
+    __init__.py's own module globals at import time, so patching the
+    origin module wouldn't affect calls made from async_setup_entry.
+    test_esphome_discovery.py's own tests import and call the real
+    function directly (with their own targeted mocks), bypassing this
+    entirely.
+    """
+
+    async def _noop_forever(hass, client) -> None:
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr("custom_components.ir_rf_hub.async_report_esphome_devices_forever", _noop_forever)
     yield
