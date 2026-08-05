@@ -14,7 +14,7 @@ import pytest
 from aiohttp.test_utils import TestServer
 
 from api import IrRfHubApiError, IrRfHubAuthError, IrRfHubClient
-from fake_hub_server import DISCOVERED_REPORTS_KEY, FIRED_KEY, WS_CLIENTS_KEY, make_app
+from fake_hub_server import DISCOVERED_REPORTS_KEY, FIRE_DEVICE_IDS_KEY, FIRED_KEY, WS_CLIENTS_KEY, make_app
 
 
 async def test_get_health(unused_tcp_port=None):
@@ -65,6 +65,34 @@ async def test_fire_command_error_status_raises_api_error():
         # the request still reached the server -- this is a rejected
         # fire (e.g. no default device), not a connection failure
         assert app[FIRED_KEY] == ["c1"]
+
+
+async def test_fire_command_without_device_id_posts_no_body():
+    app = make_app("secret-token", commands=[])
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        client = IrRfHubClient(session, server.host, server.port, "secret-token")
+        await client.async_fire_command("c1")
+        assert app[FIRE_DEVICE_IDS_KEY]["c1"] is None
+
+
+async def test_fire_command_with_device_id_posts_it():
+    app = make_app("secret-token", commands=[])
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        client = IrRfHubClient(session, server.host, server.port, "secret-token")
+        await client.async_fire_command("c1", device_id="d1")
+        assert app[FIRE_DEVICE_IDS_KEY]["c1"] == "d1"
+
+
+async def test_get_candidate_devices_parses_into_options():
+    app = make_app(
+        "secret-token",
+        commands=[],
+        candidate_devices={"c1": [{"id": "d1", "name": "Living Room"}, {"id": "d2", "name": "Bedroom"}]},
+    )
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        client = IrRfHubClient(session, server.host, server.port, "secret-token")
+        options = await client.async_get_candidate_devices("c1")
+        assert [(o.id, o.name) for o in options] == [("d1", "Living Room"), ("d2", "Bedroom")]
 
 
 async def test_report_discovered_devices_posts_the_list():

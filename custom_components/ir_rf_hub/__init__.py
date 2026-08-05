@@ -10,7 +10,7 @@ from .const import CONF_HOST, CONF_PORT, CONF_TOKEN, DOMAIN
 from .coordinator import IrRfHubCoordinator
 from .esphome_discovery import async_report_esphome_devices_forever
 
-PLATFORMS = ["button", "switch"]
+PLATFORMS = ["button", "switch", "select"]
 
 
 def _async_prune_orphaned_command_devices(

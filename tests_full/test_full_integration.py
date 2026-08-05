@@ -20,7 +20,7 @@ from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ir_rf_hub.const import DOMAIN
-from fake_hub_server import FIRED_KEY, WS_CLIENTS_KEY, make_app
+from fake_hub_server import FIRE_DEVICE_IDS_KEY, FIRED_KEY, WS_CLIENTS_KEY, make_app
 
 
 def _encode_pairing_code(host: str, port: int, token: str) -> str:
@@ -214,21 +214,23 @@ async def test_config_flow_manual_repair_refreshes_stale_token_on_existing_entry
 # -- entity setup ---------------------------------------------------------------
 
 
-async def test_setup_creates_button_and_switch_grouped_under_one_device(hass):
+async def test_setup_creates_button_switch_and_select_grouped_under_one_device(hass):
     commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}]
     app = make_app("secret-token", commands=commands)
     async with TestServer(app) as server:
         entry = await _setup_entry(hass, server, "secret-token")
 
         entities = _entities_for(hass, entry)
-        assert sorted(e.entity_id.split(".")[0] for e in entities) == ["button", "switch"]
+        assert sorted(e.entity_id.split(".")[0] for e in entities) == ["button", "select", "switch"]
 
         button = next(e for e in entities if e.entity_id.startswith("button."))
         switch = next(e for e in entities if e.entity_id.startswith("switch."))
+        select = next(e for e in entities if e.entity_id.startswith("select."))
         assert button.unique_id == f"{entry.entry_id}_c1_button"
         assert switch.unique_id == f"{entry.entry_id}_c1_switch"
+        assert select.unique_id == f"{entry.entry_id}_c1_select"
         # grouped under the same device
-        assert button.device_id == switch.device_id
+        assert button.device_id == switch.device_id == select.device_id
         assert button.device_id is not None
 
 
@@ -289,6 +291,34 @@ async def test_button_press_without_default_device_raises(hass):
             )
 
 
+async def test_select_option_fires_the_command_with_chosen_device(hass):
+    commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": "d1"}]
+    app = make_app(
+        "secret-token",
+        commands=commands,
+        candidate_devices={"c1": [{"id": "d1", "name": "Living Room"}, {"id": "d2", "name": "Bedroom"}]},
+    )
+    async with TestServer(app) as server:
+        entry = await _setup_entry(hass, server, "secret-token")
+        select_entity_id = next(
+            e.entity_id for e in _entities_for(hass, entry) if e.entity_id.startswith("select.")
+        )
+
+        state = hass.states.get(select_entity_id)
+        assert sorted(state.attributes["options"]) == ["Bedroom", "Living Room"]
+        # default_device_id "d1" resolves to its matching option name
+        assert state.state == "Living Room"
+
+        await hass.services.async_call(
+            "select", "select_option",
+            {"entity_id": select_entity_id, "option": "Bedroom"},
+            blocking=True,
+        )
+        assert app[FIRED_KEY] == ["c1"]
+        assert app[FIRE_DEVICE_IDS_KEY]["c1"] == "d2"
+        assert hass.states.get(select_entity_id).state == "Bedroom"
+
+
 # -- live sync --------------------------------------------------------------
 
 
@@ -297,7 +327,7 @@ async def test_new_command_gets_entities_without_restart(hass):
     app = make_app("secret-token", commands=commands)
     async with TestServer(app) as server:
         entry = await _setup_entry(hass, server, "secret-token")
-        assert len(_entities_for(hass, entry)) == 2
+        assert len(_entities_for(hass, entry)) == 3
 
         # Simulate a new command appearing on the App side and it
         # notifying over the same WS the coordinator is listening on.
@@ -307,9 +337,9 @@ async def test_new_command_gets_entities_without_restart(hass):
 
         for _ in range(50):
             await asyncio.sleep(0.1)
-            if len(_entities_for(hass, entry)) == 4:
+            if len(_entities_for(hass, entry)) == 6:
                 break
-        assert len(_entities_for(hass, entry)) == 4
+        assert len(_entities_for(hass, entry)) == 6
 
 
 async def test_deleted_command_removes_its_entities(hass):
@@ -320,7 +350,7 @@ async def test_deleted_command_removes_its_entities(hass):
     app = make_app("secret-token", commands=commands)
     async with TestServer(app) as server:
         entry = await _setup_entry(hass, server, "secret-token")
-        assert len(_entities_for(hass, entry)) == 4
+        assert len(_entities_for(hass, entry)) == 6
 
         device_registry = dr.async_get(hass)
         assert device_registry.async_get_device(identifiers={(DOMAIN, "c2")}) is not None
@@ -331,14 +361,15 @@ async def test_deleted_command_removes_its_entities(hass):
 
         for _ in range(50):
             await asyncio.sleep(0.1)
-            if len(_entities_for(hass, entry)) == 2:
+            if len(_entities_for(hass, entry)) == 3:
                 break
-        assert len(_entities_for(hass, entry)) == 2
+        assert len(_entities_for(hass, entry)) == 3
 
-        # entity.py groups the button+switch pair under one HA Device per
-        # Command -- removing the entities alone leaves a permanent
-        # zero-entity ghost device behind unless button.py/switch.py's
-        # _remove() also cleans up the now-empty device.
+        # entity.py groups the button+switch+select trio under one HA
+        # Device per Command -- removing the entities alone leaves a
+        # permanent zero-entity ghost device behind unless
+        # button.py/switch.py/select.py's _remove() also cleans up the
+        # now-empty device.
         assert device_registry.async_get_device(identifiers={(DOMAIN, "c2")}) is None
 
 

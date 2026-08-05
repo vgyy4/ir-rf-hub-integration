@@ -9,16 +9,24 @@ from __future__ import annotations
 from aiohttp import web
 
 FIRED_KEY = web.AppKey("fired", list)
+FIRE_DEVICE_IDS_KEY = web.AppKey("fire_device_ids", dict)
 WS_CLIENTS_KEY = web.AppKey("ws_clients", list)
 DISCOVERED_REPORTS_KEY = web.AppKey("discovered_reports", list)
 
 
-def make_app(expected_token: str, commands: list[dict], fire_status: dict[str, int] | None = None) -> web.Application:
+def make_app(
+    expected_token: str,
+    commands: list[dict],
+    fire_status: dict[str, int] | None = None,
+    candidate_devices: dict[str, list[dict]] | None = None,
+) -> web.Application:
     app = web.Application()
     app[FIRED_KEY] = []
+    app[FIRE_DEVICE_IDS_KEY] = {}
     app[WS_CLIENTS_KEY] = []
     app[DISCOVERED_REPORTS_KEY] = []
     fire_status = fire_status or {}
+    candidate_devices = candidate_devices or {}
 
     def _authorized(request: web.Request) -> bool:
         return request.headers.get("Authorization") == f"Bearer {expected_token}"
@@ -38,10 +46,23 @@ def make_app(expected_token: str, commands: list[dict], fire_status: dict[str, i
             return web.json_response({"detail": "unauthorized"}, status=401)
         command_id = request.match_info["command_id"]
         app[FIRED_KEY].append(command_id)
+        device_id = None
+        try:
+            payload = await request.json()
+            device_id = (payload or {}).get("device_id")
+        except Exception:  # noqa: BLE001 -- a bare press posts no body at all
+            pass
+        app[FIRE_DEVICE_IDS_KEY][command_id] = device_id
         status = fire_status.get(command_id, 204)
         if status == 204:
             return web.Response(status=204)
         return web.json_response({"detail": "no default device"}, status=status)
+
+    async def get_candidate_devices(request: web.Request) -> web.Response:
+        if not _authorized(request):
+            return web.json_response({"detail": "unauthorized"}, status=401)
+        command_id = request.match_info["command_id"]
+        return web.json_response(candidate_devices.get(command_id, []))
 
     async def ws_handler(request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse()
@@ -60,6 +81,7 @@ def make_app(expected_token: str, commands: list[dict], fire_status: dict[str, i
     app.router.add_get("/api/integration/health", health)
     app.router.add_get("/api/integration/commands", list_commands)
     app.router.add_post("/api/integration/commands/{command_id}/fire", fire)
+    app.router.add_get("/api/integration/commands/{command_id}/candidate-devices", get_candidate_devices)
     app.router.add_post("/api/integration/discovered-devices", discovered_devices)
     app.router.add_get("/api/ws", ws_handler)
     return app

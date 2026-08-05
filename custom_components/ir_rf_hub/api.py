@@ -34,6 +34,12 @@ class CommandRecord:
     default_device_id: str | None
 
 
+@dataclass
+class DeviceOption:
+    id: str
+    name: str
+
+
 class IrRfHubClient:
     def __init__(self, session: aiohttp.ClientSession, host: str, port: int, token: str) -> None:
         self._session = session
@@ -60,10 +66,17 @@ class IrRfHubClient:
         except aiohttp.ClientError as exc:
             raise IrRfHubApiError(str(exc)) from exc
 
-    async def async_fire_command(self, command_id: str) -> None:
+    async def async_fire_command(self, command_id: str, device_id: str | None = None) -> None:
+        """device_id is explicit-choice-only (see select.py): a bare
+        button/switch press omits it and relies on the App's own
+        default/single-candidate-transmitter fallback, matching a plain
+        POST with no body.
+        """
         try:
             async with self._session.post(
-                f"{self._base_url}/commands/{command_id}/fire", headers=self._headers
+                f"{self._base_url}/commands/{command_id}/fire",
+                headers=self._headers,
+                json={"device_id": device_id} if device_id is not None else None,
             ) as resp:
                 await self._raise_for_status(resp)
         except aiohttp.ClientError as exc:
@@ -73,6 +86,10 @@ class IrRfHubClient:
             # escapes uncaught past every `except IrRfHubApiError` in
             # config_flow.py/button.py/switch.py.
             raise IrRfHubApiError(str(exc)) from exc
+
+    async def async_get_candidate_devices(self, command_id: str) -> list[DeviceOption]:
+        data = await self._get(f"/commands/{command_id}/candidate-devices")
+        return [DeviceOption(id=d["id"], name=d["name"]) for d in data]
 
     async def _get(self, path: str):
         try:
