@@ -361,7 +361,7 @@ async def test_setup_prunes_ghost_devices_from_commands_deleted_before_this_fix_
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
-        assert device_registry.async_get_device(device_id=ghost.id) is None
+        assert device_registry.async_get(ghost.id) is None
         # The shared hub device and the still-valid command's device must
         # survive the same reconciliation pass.
         assert device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)}) is not None
