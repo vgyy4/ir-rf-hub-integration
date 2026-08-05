@@ -17,8 +17,8 @@ renamed, or deleted.
 
 1. Copy `custom_components/ir_rf_hub` into your Home Assistant `config/custom_components/` directory (or install via HACS once published there).
 2. Restart Home Assistant.
-3. Settings → Devices & services → Add integration → "IR/RF Command Hub".
-4. Open the App's own Settings page, copy the pairing code shown there, and paste it into the single field in the setup form. That's it — the code encodes the App's internal host, port, and an auth token together, so no separate host/port entry is needed.
+3. The App announces itself to Supervisor as soon as it's running, so a "IR/RF Command Hub" **Discovered** card should appear under Settings → Devices & services within a minute or so -- click it, then Submit. No fields, nothing to copy.
+4. If it doesn't show up (App not running under Supervisor, or this integration installed after the App gave up re-announcing): Settings → Devices & services → Add integration → "IR/RF Command Hub", then open the App -- the first time it starts, it shows a pairing code on a screen you can't get past until you pair -- and paste that code into the single field in the setup form. The code encodes the App's internal host, port, and an auth token together, so no separate host/port entry is needed.
 
 ## Testing
 
