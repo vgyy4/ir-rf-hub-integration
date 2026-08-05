@@ -76,4 +76,13 @@ jobs:
 
       - name: Run full integration tests
         working-directory: tests_full
-        run: python -m pytest -q
+        # -n auto (pytest-xdist): each test gets its own fresh `hass`
+        # fixture (a full HomeAssistant instance -- real per-test setup
+        # cost, not something to optimize away), so wall-clock time is
+        # dominated by that fixed per-test overhead rather than by test
+        # logic. Parallelizing across worker processes is the standard
+        # fix HA core's own test suite uses for the same reason. Each
+        # worker is a separate process, so this doesn't reintroduce the
+        # kind of cross-test state leakage conftest.py's mock_async_
+        # zeroconf fixture exists to prevent.
+        run: python -m pytest -q -n auto
