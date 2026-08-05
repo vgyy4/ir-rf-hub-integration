@@ -51,6 +51,15 @@ class IrRfHubClient:
             for c in data
         ]
 
+    async def async_report_discovered_devices(self, devices: list[dict]) -> None:
+        try:
+            async with self._session.post(
+                f"{self._base_url}/discovered-devices", headers=self._headers, json=devices
+            ) as resp:
+                await self._raise_for_status(resp)
+        except aiohttp.ClientError as exc:
+            raise IrRfHubApiError(str(exc)) from exc
+
     async def async_fire_command(self, command_id: str) -> None:
         try:
             async with self._session.post(

@@ -8,6 +8,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import IrRfHubClient
 from .const import CONF_HOST, CONF_PORT, CONF_TOKEN, DOMAIN
 from .coordinator import IrRfHubCoordinator
+from .esphome_discovery import async_report_esphome_devices_forever
 
 PLATFORMS = ["button", "switch"]
 
@@ -20,6 +21,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_setup()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+
+    # Best-effort: lets the App discover ESPHome devices for its "add a
+    # device" UI via Home Assistant Core's reliable zeroconf instead of
+    # its own (not always reachable) local mDNS -- see
+    # esphome_discovery.py. Tied to the entry's lifecycle, so it's
+    # cancelled automatically on unload.
+    entry.async_create_background_task(
+        hass,
+        async_report_esphome_devices_forever(hass, client),
+        name=f"{DOMAIN}_esphome_discovery_{entry.entry_id}",
+    )
 
     # The umbrella "hub" device every per-command device nests under via
     # via_device (see entity.py) -- must actually exist in the registry
