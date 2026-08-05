@@ -14,7 +14,7 @@ import pytest
 from aiohttp.test_utils import TestServer
 
 from api import IrRfHubApiError, IrRfHubAuthError, IrRfHubClient
-from fake_hub_server import FIRED_KEY, WS_CLIENTS_KEY, make_app
+from fake_hub_server import DISCOVERED_REPORTS_KEY, FIRED_KEY, WS_CLIENTS_KEY, make_app
 
 
 async def test_get_health(unused_tcp_port=None):
@@ -65,6 +65,23 @@ async def test_fire_command_error_status_raises_api_error():
         # the request still reached the server -- this is a rejected
         # fire (e.g. no default device), not a connection failure
         assert app[FIRED_KEY] == ["c1"]
+
+
+async def test_report_discovered_devices_posts_the_list():
+    app = make_app("secret-token", commands=[])
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        client = IrRfHubClient(session, server.host, server.port, "secret-token")
+        devices = [{"name": "living-room-esp", "host": "10.0.0.9", "port": 6053}]
+        await client.async_report_discovered_devices(devices)
+        assert app[DISCOVERED_REPORTS_KEY] == [devices]
+
+
+async def test_report_discovered_devices_wrong_token_raises_auth_error():
+    app = make_app("secret-token", commands=[])
+    async with TestServer(app) as server, aiohttp.ClientSession() as session:
+        client = IrRfHubClient(session, server.host, server.port, "wrong-token")
+        with pytest.raises(IrRfHubAuthError):
+            await client.async_report_discovered_devices([])
 
 
 async def test_listen_events_reconnect_callback_and_event_delivery():

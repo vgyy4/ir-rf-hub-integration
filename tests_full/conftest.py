@@ -43,3 +43,29 @@ def auto_enable_sockets(socket_enabled):
     App.
     """
     yield
+
+
+@pytest.fixture(autouse=True)
+def _mock_zeroconf(mock_async_zeroconf):
+    """manifest.json now declares zeroconf as a dependency (hassfest
+    requires it, since esphome_discovery.py imports
+    homeassistant.components.zeroconf), so Home Assistant Core's own
+    zeroconf.async_setup() runs automatically for every test that sets up
+    this integration's config entry -- not just the ones that go through
+    our own background discovery task. async_setup() constructs a *real*
+    Zeroconf instance via its own internal _async_get_instance() call
+    (not the public async_get_async_instance() wrapper our code uses, so
+    patching only that wrapper doesn't cover this path). A real instance
+    here corrupts hass's own EVENT_HOMEASSISTANT_CLOSE-triggered zeroconf
+    teardown badly enough to crash *later*, unrelated tests with
+    "RuntimeError: Event loop is closed" -- confirmed by CI across
+    several iterations chasing the actual construction site.
+
+    mock_async_zeroconf is pytest-homeassistant-custom-component's own
+    official fixture for exactly this: it patches the HaZeroconf/
+    HaAsyncZeroconf *classes* Home Assistant Core constructs from, so it
+    covers every call path uniformly (async_setup, our own
+    async_get_async_instance call, whatever else) rather than chasing
+    individual functions that happen to call into them.
+    """
+    yield

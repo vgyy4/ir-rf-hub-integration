@@ -10,12 +10,14 @@ from aiohttp import web
 
 FIRED_KEY = web.AppKey("fired", list)
 WS_CLIENTS_KEY = web.AppKey("ws_clients", list)
+DISCOVERED_REPORTS_KEY = web.AppKey("discovered_reports", list)
 
 
 def make_app(expected_token: str, commands: list[dict], fire_status: dict[str, int] | None = None) -> web.Application:
     app = web.Application()
     app[FIRED_KEY] = []
     app[WS_CLIENTS_KEY] = []
+    app[DISCOVERED_REPORTS_KEY] = []
     fire_status = fire_status or {}
 
     def _authorized(request: web.Request) -> bool:
@@ -49,8 +51,15 @@ def make_app(expected_token: str, commands: list[dict], fire_status: dict[str, i
             pass
         return ws
 
+    async def discovered_devices(request: web.Request) -> web.Response:
+        if not _authorized(request):
+            return web.json_response({"detail": "unauthorized"}, status=401)
+        app[DISCOVERED_REPORTS_KEY].append(await request.json())
+        return web.Response(status=204)
+
     app.router.add_get("/api/integration/health", health)
     app.router.add_get("/api/integration/commands", list_commands)
     app.router.add_post("/api/integration/commands/{command_id}/fire", fire)
+    app.router.add_post("/api/integration/discovered-devices", discovered_devices)
     app.router.add_get("/api/ws", ws_handler)
     return app
