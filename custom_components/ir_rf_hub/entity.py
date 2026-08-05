@@ -4,7 +4,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import CommandRecord
-from .const import CONF_DEVICE_GROUPING, DEFAULT_DEVICE_GROUPING
+from .const import CONF_DEVICE_GROUPING, DEFAULT_DEVICE_GROUPING, MODE_SEPARATE
 from .coordinator import IrRfHubCoordinator
 from .device_grouping import device_info_for
 
@@ -29,12 +29,32 @@ class IrRfHubCommandEntity(CoordinatorEntity[IrRfHubCoordinator]):
         return self.coordinator.data.get(self._command_id)
 
     @property
+    def _grouping_mode(self) -> str:
+        return self.coordinator.entry.options.get(CONF_DEVICE_GROUPING, DEFAULT_DEVICE_GROUPING)
+
+    def _qualified_name(self, suffix: str) -> str:
+        """In "separate" mode, this entity's device is named after its
+        own command (see device_info below), so a plain per-type suffix
+        ("Button", "Switch", "Send via") is enough to disambiguate --
+        has_entity_name combines it with the device name automatically.
+        In "unified"/"split_by_type" mode, many commands' entities share
+        one device, so that plain suffix alone would be identical across
+        every command's Button/Switch/Select and impossible to tell
+        apart in the device's entity list -- prefixing with the command
+        name keeps every entity distinguishable regardless of mode.
+        """
+        if self._grouping_mode == MODE_SEPARATE:
+            return suffix
+        command = self._command
+        name = command.name if command else self._command_id
+        return f"{name} {suffix}"
+
+    @property
     def available(self) -> bool:
         return super().available and self._command is not None
 
     @property
     def device_info(self) -> DeviceInfo:
-        mode = self.coordinator.entry.options.get(CONF_DEVICE_GROUPING, DEFAULT_DEVICE_GROUPING)
         return device_info_for(
-            self.coordinator.entry.entry_id, self._command_id, self._command, self._entity_kind, mode
+            self.coordinator.entry.entry_id, self._command_id, self._command, self._entity_kind, self._grouping_mode
         )

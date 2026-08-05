@@ -68,13 +68,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class IrRfHubSwitch(IrRfHubCommandEntity, SwitchEntity):
-    _attr_name = "Switch"
     _attr_assumed_state = True
 
     def __init__(self, coordinator: IrRfHubCoordinator, command_id: str) -> None:
         super().__init__(coordinator, command_id, entity_kind="switch")
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{command_id}_switch"
         self._attr_is_on = False
+
+    @property
+    def name(self) -> str:
+        return self._qualified_name("Switch")
 
     async def async_turn_on(self, **kwargs) -> None:
         try:

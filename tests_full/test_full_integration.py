@@ -233,6 +233,13 @@ async def test_setup_creates_button_switch_and_select_grouped_under_one_device(h
         assert button.device_id == switch.device_id == select.device_id
         assert button.device_id is not None
 
+        # "separate" mode: the device is already named after the command,
+        # so the plain per-type suffix is enough -- has_entity_name
+        # combines it with the device name for the full friendly_name.
+        assert hass.states.get(button.entity_id).attributes["friendly_name"] == "TV Power Button"
+        assert hass.states.get(switch.entity_id).attributes["friendly_name"] == "TV Power Switch"
+        assert hass.states.get(select.entity_id).attributes["friendly_name"] == "TV Power Send via"
+
 
 # -- firing commands --------------------------------------------------------------
 
@@ -447,6 +454,14 @@ async def test_changing_grouping_mode_reloads_and_regroups_devices(hass):
         assert len(entities) == 3
         assert all(e.device_id == hub_device.id for e in entities)
 
+        # unified mode: the hub device's own name ("IR/RF Command Hub")
+        # no longer disambiguates between commands sharing it, so each
+        # entity's own name must be qualified with the command name --
+        # otherwise every command's Button/Switch/Send via would be
+        # identically named and indistinguishable on the device's page.
+        button = next(e for e in entities if e.entity_id.startswith("button."))
+        assert hass.states.get(button.entity_id).attributes["friendly_name"] == "IR/RF Command Hub TV Power Button"
+
 
 async def test_split_by_type_mode_groups_buttons_and_selects_separately_from_switches(hass):
     commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}]
@@ -478,6 +493,13 @@ async def test_split_by_type_mode_groups_buttons_and_selects_separately_from_swi
         assert switches_device.name == "Switches"
         # no leftover per-command device from the (unused) separate mode
         assert device_registry.async_get_device(identifiers={(DOMAIN, "c1")}) is None
+
+        # split-by-type mode: "Buttons"/"Switches" are shared across every
+        # command, so each entity's own name must still carry the command
+        # name to stay distinguishable from another command's button.
+        assert hass.states.get(button.entity_id).attributes["friendly_name"] == "Buttons TV Power Button"
+        assert hass.states.get(select.entity_id).attributes["friendly_name"] == "Buttons TV Power Send via"
+        assert hass.states.get(switch.entity_id).attributes["friendly_name"] == "Switches TV Power Switch"
 
         # deleting the only command empties both virtual devices, which
         # should then be pruned just like a per-command device would be.
