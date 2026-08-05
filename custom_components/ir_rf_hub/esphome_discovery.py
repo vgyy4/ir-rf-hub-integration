@@ -81,7 +81,13 @@ async def _browse_once(zeroconf) -> list[dict]:
                 "port": info.port or 6053,
             }
 
-    def _on_change(zc, service_type, name, state_change) -> None:  # noqa: ANN001
+    # First param must be named exactly `zeroconf` -- the zeroconf
+    # library's Signal.fire() invokes listeners with keyword arguments
+    # matching this name; anything else raises
+    # "got an unexpected keyword argument 'zeroconf'" (confirmed by a
+    # real install's logs, since this went uncaught by every test here
+    # -- none of them exercise a real Signal.fire() call).
+    def _on_change(zeroconf, service_type, name, state_change) -> None:  # noqa: ANN001
         if state_change is ServiceStateChange.Added:
             pending.add(asyncio.ensure_future(_resolve(name)))
 

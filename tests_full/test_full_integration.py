@@ -142,25 +142,72 @@ async def test_config_flow_hassio_discovery_unreachable_aborts(hass):
     assert result["reason"] == "cannot_connect"
 
 
-async def test_config_flow_hassio_discovery_already_configured_aborts(hass):
-    # _setup_entry() doesn't set unique_id (the other tests using it don't
-    # need duplicate-detection), so build the pre-existing entry directly
-    # with the same unique_id async_step_hassio derives (f"{host}:{port}"),
-    # and no need for a real fake server since the abort happens before
-    # any connectivity check.
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        unique_id="127.0.0.1:9999",
-        data={"host": "127.0.0.1", "port": 9999, "token": "secret-token"},
-    )
-    entry.add_to_hass(hass)
+async def test_config_flow_hassio_discovery_refreshes_stale_token_on_existing_entry(hass):
+    # Simulates "the App got reinstalled": Supervisor keeps the add-on's
+    # internal hostname stable across a plain uninstall+reinstall (so
+    # unique_id is unchanged), but the App issued a fresh pairing token.
+    # The old behavior (_abort_if_unique_id_configured) left the existing
+    # entry's stale token in place forever -- confirmed on a real install
+    # as IrRfHubAuthError on every coordinator setup, with no obvious fix
+    # short of manually deleting and re-adding the integration.
+    app = make_app("new-token-after-reinstall", commands=[])
+    async with TestServer(app) as server:
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            unique_id=f"{server.host}:{server.port}",
+            data={"host": server.host, "port": server.port, "token": "stale-token-from-before-reinstall"},
+        )
+        entry.add_to_hass(hass)
 
-    discovery_info = _hassio_discovery("127.0.0.1", 9999, "secret-token")
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": "hassio"}, data=discovery_info
-    )
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "already_configured"
+        discovery_info = _hassio_discovery(server.host, server.port, "new-token-after-reinstall")
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": "hassio"}, data=discovery_info
+        )
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "already_configured"
+        assert entry.data == {"host": server.host, "port": server.port, "token": "new-token-after-reinstall"}
+
+
+async def test_config_flow_hassio_discovery_wrong_token_leaves_existing_entry_untouched(hass):
+    # The health check runs before the existing-entry refresh, so a bad
+    # announced token can't clobber a working stored one.
+    app = make_app("the-real-token", commands=[])
+    async with TestServer(app) as server:
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            unique_id=f"{server.host}:{server.port}",
+            data={"host": server.host, "port": server.port, "token": "the-real-token"},
+        )
+        entry.add_to_hass(hass)
+
+        discovery_info = _hassio_discovery(server.host, server.port, "some-wrong-token")
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": "hassio"}, data=discovery_info
+        )
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "invalid_auth"
+        assert entry.data == {"host": server.host, "port": server.port, "token": "the-real-token"}
+
+
+async def test_config_flow_manual_repair_refreshes_stale_token_on_existing_entry(hass):
+    # Same "App got reinstalled" scenario, but via the manual paste-a-code
+    # fallback rather than automatic hassio discovery.
+    app = make_app("new-token-after-reinstall", commands=[])
+    async with TestServer(app) as server:
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            unique_id=f"{server.host}:{server.port}",
+            data={"host": server.host, "port": server.port, "token": "stale-token-from-before-reinstall"},
+        )
+        entry.add_to_hass(hass)
+
+        code = _encode_pairing_code(server.host, server.port, "new-token-after-reinstall")
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+        result2 = await hass.config_entries.flow.async_configure(result["flow_id"], {"pairing_code": code})
+
+        assert result2["type"] is FlowResultType.ABORT
+        assert result2["reason"] == "already_configured"
+        assert entry.data == {"host": server.host, "port": server.port, "token": "new-token-after-reinstall"}
 
 
 # -- entity setup ---------------------------------------------------------------
