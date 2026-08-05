@@ -4,17 +4,14 @@ homeassistant.components.zeroconf.async_get_async_instance(hass) is a
 valid call and the loop correctly forwards whatever a browse cycle
 finds to the client.
 
-Both the actual mDNS browse (_browse_once) and the shared-Zeroconf
-lookup itself are monkeypatched out. Real multicast discovery doesn't
-belong in a unit test (see the App-side tests_full's own equivalent --
-it never tests its own local mDNS browse either, only the merge logic
-around it). Constructing a *real* HaAsyncZeroconf here (even one whose
-result goes unused, since _browse_once is mocked) trips HA's
-"multiple Zeroconf instance" detector and leaves a dangling instance
-that crashes *other* tests' teardown with "Event loop is closed" --
-confirmed by an earlier version of this file failing CI. Monkeypatching
-async_get_async_instance itself avoids ever creating one, while still
-exercising the real call site/import path.
+The actual mDNS browse (_browse_once) is monkeypatched out here --
+real multicast discovery doesn't belong in a unit test (see the App-
+side tests_full's own equivalent: it never tests its own local mDNS
+browse either, only the merge logic around it). The shared-Zeroconf
+lookup itself (async_get_async_instance) is neutralized globally by
+conftest.py's autouse _no_real_zeroconf_instance fixture -- constructing
+a *real* HaAsyncZeroconf turned out to corrupt hass's own teardown
+badly enough to crash *other*, unrelated tests, confirmed by CI.
 """
 
 from __future__ import annotations
@@ -33,18 +30,6 @@ class _RecordingClient:
 
     async def async_report_discovered_devices(self, devices: list[dict]) -> None:
         self.reports.append(devices)
-
-
-class _FakeAsyncZeroconf:
-    zeroconf = None
-
-
-@pytest.fixture(autouse=True)
-def _no_real_zeroconf_instance(monkeypatch: pytest.MonkeyPatch):
-    async def fake_get_async_instance(hass):
-        return _FakeAsyncZeroconf()
-
-    monkeypatch.setattr(esphome_discovery.ha_zeroconf, "async_get_async_instance", fake_get_async_instance)
 
 
 async def test_reports_whatever_a_browse_cycle_finds(hass, monkeypatch: pytest.MonkeyPatch):
