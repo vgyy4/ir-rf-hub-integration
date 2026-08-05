@@ -342,6 +342,32 @@ async def test_deleted_command_removes_its_entities(hass):
         assert device_registry.async_get_device(identifiers={(DOMAIN, "c2")}) is None
 
 
+async def test_setup_prunes_ghost_devices_from_commands_deleted_before_this_fix_existed(hass):
+    # Simulates an install that already had a stale per-command device
+    # sitting in the registry from before button.py/switch.py's
+    # SIGNAL_COMMAND_REMOVED handler started cleaning up devices too --
+    # that reactive path can't retroactively fix installs that hit it
+    # while the bug was still present, so setup itself has to reconcile.
+    app = make_app("secret-token", commands=[{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}])
+    async with TestServer(app) as server:
+        entry = MockConfigEntry(domain=DOMAIN, data={"host": server.host, "port": server.port, "token": "secret-token"})
+        entry.add_to_hass(hass)
+
+        device_registry = dr.async_get(hass)
+        ghost = device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id, identifiers={(DOMAIN, "long-deleted-command-id")}, name="Ghost"
+        )
+
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        assert device_registry.async_get(ghost.id) is None
+        # The shared hub device and the still-valid command's device must
+        # survive the same reconciliation pass.
+        assert device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)}) is not None
+        assert device_registry.async_get_device(identifiers={(DOMAIN, "c1")}) is not None
+
+
 # -- unload --------------------------------------------------------------
 
 

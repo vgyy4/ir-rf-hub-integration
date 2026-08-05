@@ -13,12 +13,33 @@ from .esphome_discovery import async_report_esphome_devices_forever
 PLATFORMS = ["button", "switch"]
 
 
+def _async_prune_orphaned_command_devices(
+    hass: HomeAssistant, entry: ConfigEntry, coordinator: IrRfHubCoordinator
+) -> None:
+    """One-time reconciliation at setup, not just reactive: catches ghost
+    per-command devices left behind by commands deleted *before*
+    button.py/switch.py's SIGNAL_COMMAND_REMOVED handler started also
+    removing the device (or from that live path being missed for any
+    other reason, e.g. the App unreachable at the exact moment of
+    deletion) -- runs against every existing entry on every setup, so it
+    self-heals regardless of when the fix actually landed for a given
+    install.
+    """
+    device_registry = dr.async_get(hass)
+    valid_ids = set(coordinator.data.keys()) | {entry.entry_id}
+    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
+        identifiers = {identifier for domain, identifier in device.identifiers if domain == DOMAIN}
+        if identifiers and not identifiers & valid_ids:
+            device_registry.async_remove_device(device.id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = async_get_clientsession(hass)
     client = IrRfHubClient(session, entry.data[CONF_HOST], entry.data[CONF_PORT], entry.data[CONF_TOKEN])
 
     coordinator = IrRfHubCoordinator(hass, entry, client)
     await coordinator.async_setup()
+    _async_prune_orphaned_command_devices(hass, entry, coordinator)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
