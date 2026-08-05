@@ -4,21 +4,25 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .api import CommandRecord
-from .const import DOMAIN
+from .const import CONF_DEVICE_GROUPING, DEFAULT_DEVICE_GROUPING
 from .coordinator import IrRfHubCoordinator
+from .device_grouping import device_info_for
 
 
 class IrRfHubCommandEntity(CoordinatorEntity[IrRfHubCoordinator]):
-    """Base for the button/switch pair on one command. One HA Device per
-    Command (not per physical ESPHome device) -- users reason about "TV
-    Power," not about which ESP32 happens to route it.
+    """Base for the button/switch/select trio on one command. How they're
+    grouped into HA Devices is user-configurable via the integration's
+    options flow (see device_grouping.py) -- entity_kind is which of the
+    three this instance is, needed because "split by type" mode groups
+    differently per kind.
     """
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: IrRfHubCoordinator, command_id: str) -> None:
+    def __init__(self, coordinator: IrRfHubCoordinator, command_id: str, entity_kind: str) -> None:
         super().__init__(coordinator)
         self._command_id = command_id
+        self._entity_kind = entity_kind
 
     @property
     def _command(self) -> CommandRecord | None:
@@ -30,13 +34,7 @@ class IrRfHubCommandEntity(CoordinatorEntity[IrRfHubCoordinator]):
 
     @property
     def device_info(self) -> DeviceInfo:
-        command = self._command
-        name = command.name if command else self._command_id
-        model = "IR Command" if (command is None or command.type == "ir") else "RF Command"
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._command_id)},
-            name=name,
-            manufacturer="IR/RF Command Hub",
-            model=model,
-            via_device=(DOMAIN, self.coordinator.entry.entry_id),
+        mode = self.coordinator.entry.options.get(CONF_DEVICE_GROUPING, DEFAULT_DEVICE_GROUPING)
+        return device_info_for(
+            self.coordinator.entry.entry_id, self._command_id, self._command, self._entity_kind, mode
         )

@@ -42,16 +42,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         if entity is None or entity.entity_id is None:
             return
         registry = er.async_get(hass)
-        if registry.async_get(entity.entity_id) is not None:
+        registry_entry = registry.async_get(entity.entity_id)
+        device_id = registry_entry.device_id if registry_entry is not None else None
+        if registry_entry is not None:
             registry.async_remove(entity.entity_id)
 
-        # See button.py's matching block -- one HA Device per Command,
-        # shared with the sibling button entity, that HA never auto-
-        # removes on its own. Safe from both platforms: whichever runs
-        # second is the one that finds zero entities left.
+        # See button.py's matching block -- device grouping is mode-
+        # dependent, so look it up by the entity's own device_id and
+        # never remove the hub device. Safe from all three platforms:
+        # whichever runs last is the one that finds zero entities left.
+        if device_id is None:
+            return
         device_registry = dr.async_get(hass)
-        device = device_registry.async_get_device(identifiers={(DOMAIN, command_id)})
-        if device is not None and not er.async_entries_for_device(registry, device.id, include_disabled_entities=True):
+        device = device_registry.async_get(device_id)
+        if device is None or (DOMAIN, entry.entry_id) in device.identifiers:
+            return
+        if not er.async_entries_for_device(registry, device.id, include_disabled_entities=True):
             device_registry.async_remove_device(device.id)
 
     for command in coordinator.data.values():
@@ -66,7 +72,7 @@ class IrRfHubSwitch(IrRfHubCommandEntity, SwitchEntity):
     _attr_assumed_state = True
 
     def __init__(self, coordinator: IrRfHubCoordinator, command_id: str) -> None:
-        super().__init__(coordinator, command_id)
+        super().__init__(coordinator, command_id, entity_kind="switch")
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{command_id}_switch"
         self._attr_is_on = False
 

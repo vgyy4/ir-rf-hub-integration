@@ -6,8 +6,18 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import IrRfHubClient
-from .const import CONF_HOST, CONF_PORT, CONF_TOKEN, DOMAIN
+from .const import (
+    CONF_DEVICE_GROUPING,
+    CONF_HOST,
+    CONF_PORT,
+    CONF_TOKEN,
+    DEFAULT_DEVICE_GROUPING,
+    DOMAIN,
+    MODE_SEPARATE,
+    MODE_SPLIT_BY_TYPE,
+)
 from .coordinator import IrRfHubCoordinator
+from .device_grouping import split_device_ids
 from .esphome_discovery import async_report_esphome_devices_forever
 
 PLATFORMS = ["button", "switch", "select"]
@@ -17,20 +27,36 @@ def _async_prune_orphaned_command_devices(
     hass: HomeAssistant, entry: ConfigEntry, coordinator: IrRfHubCoordinator
 ) -> None:
     """One-time reconciliation at setup, not just reactive: catches ghost
-    per-command devices left behind by commands deleted *before*
-    button.py/switch.py's SIGNAL_COMMAND_REMOVED handler started also
-    removing the device (or from that live path being missed for any
-    other reason, e.g. the App unreachable at the exact moment of
-    deletion) -- runs against every existing entry on every setup, so it
-    self-heals regardless of when the fix actually landed for a given
-    install.
+    devices left behind by commands deleted *before*
+    button.py/switch.py/select.py's SIGNAL_COMMAND_REMOVED handler
+    started also removing the device (or from that live path being
+    missed for any other reason, e.g. the App unreachable at the exact
+    moment of deletion) -- runs against every existing entry on every
+    setup, so it self-heals regardless of when the fix actually landed
+    for a given install. Also mode-aware: switching the device-grouping
+    option leaves the *old* mode's devices behind (a per-command device
+    is meaningless once "unified" is selected, for instance) with no
+    entities pointing at it any more, which this same pass catches too.
     """
+    mode = entry.options.get(CONF_DEVICE_GROUPING, DEFAULT_DEVICE_GROUPING)
+    valid_ids = {entry.entry_id}
+    if mode == MODE_SEPARATE:
+        valid_ids |= set(coordinator.data.keys())
+    elif mode == MODE_SPLIT_BY_TYPE:
+        valid_ids |= split_device_ids(entry.entry_id)
+
     device_registry = dr.async_get(hass)
-    valid_ids = set(coordinator.data.keys()) | {entry.entry_id}
     for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
         identifiers = {identifier for domain, identifier in device.identifiers if domain == DOMAIN}
         if identifiers and not identifiers & valid_ids:
             device_registry.async_remove_device(device.id)
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    # HA does not reload an entry on its own just because options
+    # changed -- without this, picking a new device-grouping mode in the
+    # options flow would silently do nothing until the next restart.
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -42,6 +68,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _async_prune_orphaned_command_devices(hass, entry, coordinator)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
     # Best-effort: lets the App discover ESPHome devices for its "add a
     # device" UI via Home Assistant Core's reliable zeroconf instead of

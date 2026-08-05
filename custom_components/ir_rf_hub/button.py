@@ -43,19 +43,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         # registry removal is what actually makes a deleted command's
         # entities disappear for good, not just go unavailable.
         registry = er.async_get(hass)
-        if registry.async_get(entity.entity_id) is not None:
+        registry_entry = registry.async_get(entity.entity_id)
+        device_id = registry_entry.device_id if registry_entry is not None else None
+        if registry_entry is not None:
             registry.async_remove(entity.entity_id)
 
-        # entity.py makes one HA Device per Command (identifiers=(DOMAIN,
-        # command_id)), shared by this button and its sibling switch. HA
-        # never auto-removes a device just because its entities are gone
-        # -- without this, every deleted command leaves a permanent
-        # zero-entity ghost device behind. Safe to run from both
-        # button.py and switch.py's _remove: whichever runs second is the
-        # one that actually finds zero entities left and does the removal.
+        # Depending on the device-grouping option (see device_grouping.py),
+        # this device may be per-command, shared across many commands
+        # (split-by-type), or the permanent hub device itself (unified) --
+        # look it up by the entity's own device_id rather than assuming an
+        # identifier, and never remove the hub device. HA never auto-
+        # removes a device just because its entities are gone, so without
+        # this a deleted command (or the last entity of a shared device)
+        # leaves a permanent zero-entity ghost behind. Safe to run from
+        # button.py/switch.py/select.py's _remove independently: whichever
+        # runs last is the one that actually finds zero entities left.
+        if device_id is None:
+            return
         device_registry = dr.async_get(hass)
-        device = device_registry.async_get_device(identifiers={(DOMAIN, command_id)})
-        if device is not None and not er.async_entries_for_device(registry, device.id, include_disabled_entities=True):
+        device = device_registry.async_get(device_id)
+        if device is None or (DOMAIN, entry.entry_id) in device.identifiers:
+            return
+        if not er.async_entries_for_device(registry, device.id, include_disabled_entities=True):
             device_registry.async_remove_device(device.id)
 
     for command in coordinator.data.values():
@@ -69,7 +78,7 @@ class IrRfHubButton(IrRfHubCommandEntity, ButtonEntity):
     _attr_name = "Button"
 
     def __init__(self, coordinator: IrRfHubCoordinator, command_id: str) -> None:
-        super().__init__(coordinator, command_id)
+        super().__init__(coordinator, command_id, entity_kind="button")
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{command_id}_button"
 
     async def async_press(self) -> None:

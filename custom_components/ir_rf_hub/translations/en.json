@@ -23,5 +23,25 @@
       "invalid_auth": "The App rejected the pairing token it announced. It may have been regenerated -- open the App to get a fresh one and add the integration manually.",
       "cannot_connect": "Found the App but couldn't reach it. Make sure it's running and try again."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "IR/RF Command Hub",
+        "description": "Choose how commands should be grouped into devices.",
+        "data": {
+          "device_grouping": "Device grouping"
+        }
+      }
+    }
+  },
+  "selector": {
+    "device_grouping": {
+      "options": {
+        "separate": "One device per command (default)",
+        "unified": "One device for everything",
+        "split_by_type": "Two devices: Buttons and Switches"
+      }
+    }
   }
 }
