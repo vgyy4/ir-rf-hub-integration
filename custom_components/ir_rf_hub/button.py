@@ -75,11 +75,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class IrRfHubButton(IrRfHubCommandEntity, ButtonEntity):
-    _attr_name = "Button"
-
     def __init__(self, coordinator: IrRfHubCoordinator, command_id: str) -> None:
         super().__init__(coordinator, command_id, entity_kind="button")
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{command_id}_button"
+
+    @property
+    def name(self) -> str:
+        return self._qualified_name("Button")
 
     async def async_press(self) -> None:
         try:

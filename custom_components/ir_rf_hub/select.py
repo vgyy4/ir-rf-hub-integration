@@ -76,13 +76,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class IrRfHubDeviceSelect(IrRfHubCommandEntity, SelectEntity):
-    _attr_name = "Send via"
-
     def __init__(self, coordinator: IrRfHubCoordinator, command_id: str) -> None:
         super().__init__(coordinator, command_id, entity_kind="select")
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{command_id}_select"
         self._attr_options: list[str] = []
         self._device_ids_by_name: dict[str, str] = {}
+
+    @property
+    def name(self) -> str:
+        return self._qualified_name("Send via")
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
