@@ -19,7 +19,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.ir_rf_hub.const import DOMAIN
+from custom_components.ir_rf_hub.const import CONF_DEVICE_GROUPING, DOMAIN, MODE_SPLIT_BY_TYPE, MODE_UNIFIED
 from fake_hub_server import FIRE_DEVICE_IDS_KEY, FIRED_KEY, WS_CLIENTS_KEY, make_app
 
 
@@ -397,6 +397,103 @@ async def test_setup_prunes_ghost_devices_from_commands_deleted_before_this_fix_
         # survive the same reconciliation pass.
         assert device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)}) is not None
         assert device_registry.async_get_device(identifiers={(DOMAIN, "c1")}) is not None
+
+
+# -- device grouping options --------------------------------------------------------------
+
+
+async def test_options_flow_shows_current_mode_and_saves_new_one(hass):
+    commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}]
+    app = make_app("secret-token", commands=commands)
+    async with TestServer(app) as server:
+        entry = await _setup_entry(hass, server, "secret-token")
+
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "init"
+
+        result2 = await hass.config_entries.options.async_configure(
+            result["flow_id"], {CONF_DEVICE_GROUPING: MODE_UNIFIED}
+        )
+        assert result2["type"] is FlowResultType.CREATE_ENTRY
+        assert entry.options[CONF_DEVICE_GROUPING] == MODE_UNIFIED
+
+
+async def test_changing_grouping_mode_reloads_and_regroups_devices(hass):
+    # No add_update_listener means HA silently does nothing on an options
+    # change -- this exercises the full path, not just that the option
+    # value got saved.
+    commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}]
+    app = make_app("secret-token", commands=commands)
+    async with TestServer(app) as server:
+        entry = await _setup_entry(hass, server, "secret-token")
+        device_registry = dr.async_get(hass)
+        assert device_registry.async_get_device(identifiers={(DOMAIN, "c1")}) is not None
+
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        await hass.config_entries.options.async_configure(
+            result["flow_id"], {CONF_DEVICE_GROUPING: MODE_UNIFIED}
+        )
+        await hass.async_block_till_done()
+
+        assert entry.state.value == "loaded"
+        # unified mode: the per-command device is gone, every entity now
+        # nests under the hub device instead.
+        assert device_registry.async_get_device(identifiers={(DOMAIN, "c1")}) is None
+        hub_device = device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+        assert hub_device is not None
+
+        entities = _entities_for(hass, entry)
+        assert len(entities) == 3
+        assert all(e.device_id == hub_device.id for e in entities)
+
+
+async def test_split_by_type_mode_groups_buttons_and_selects_separately_from_switches(hass):
+    commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}]
+    app = make_app("secret-token", commands=commands)
+    async with TestServer(app) as server:
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={"host": server.host, "port": server.port, "token": "secret-token"},
+            options={CONF_DEVICE_GROUPING: MODE_SPLIT_BY_TYPE},
+        )
+        entry.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        device_registry = dr.async_get(hass)
+        registry = er.async_get(hass)
+        entities = _entities_for(hass, entry)
+
+        button = next(e for e in entities if e.entity_id.startswith("button."))
+        select = next(e for e in entities if e.entity_id.startswith("select."))
+        switch = next(e for e in entities if e.entity_id.startswith("switch."))
+
+        assert button.device_id == select.device_id
+        assert button.device_id != switch.device_id
+
+        buttons_device = device_registry.async_get(button.device_id)
+        switches_device = device_registry.async_get(switch.device_id)
+        assert buttons_device.name == "Buttons"
+        assert switches_device.name == "Switches"
+        # no leftover per-command device from the (unused) separate mode
+        assert device_registry.async_get_device(identifiers={(DOMAIN, "c1")}) is None
+
+        # deleting the only command empties both virtual devices, which
+        # should then be pruned just like a per-command device would be.
+        commands.clear()
+        for ws in app[WS_CLIENTS_KEY]:
+            await ws.send_json({"type": "command.deleted", "data": {"command_id": "c1"}})
+        for _ in range(50):
+            await asyncio.sleep(0.1)
+            if not _entities_for(hass, entry):
+                break
+        assert not _entities_for(hass, entry)
+        assert device_registry.async_get(buttons_device.id) is None
+        assert device_registry.async_get(switches_device.id) is None
+        # the hub device itself is never touched by this cleanup
+        assert device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)}) is not None
+        assert registry.async_get(button.entity_id) is None
 
 
 # -- unload --------------------------------------------------------------

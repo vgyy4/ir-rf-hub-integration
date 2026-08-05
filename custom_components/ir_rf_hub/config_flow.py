@@ -22,17 +22,36 @@ from __future__ import annotations
 import logging
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntryState, ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigEntryState,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from .api import IrRfHubApiError, IrRfHubAuthError, IrRfHubClient
-from .const import CONF_HOST, CONF_PORT, CONF_TOKEN, DOMAIN
+from .const import (
+    CONF_DEVICE_GROUPING,
+    CONF_HOST,
+    CONF_PORT,
+    CONF_TOKEN,
+    DEFAULT_DEVICE_GROUPING,
+    DOMAIN,
+    MODE_SEPARATE,
+    MODE_SPLIT_BY_TYPE,
+    MODE_UNIFIED,
+)
 from .pairing import PairingCodeError, decode_pairing_code
 
 logger = logging.getLogger(__name__)
 
 STEP_USER_SCHEMA = vol.Schema({vol.Required("pairing_code"): str})
+
+DEVICE_GROUPING_OPTIONS = [MODE_SEPARATE, MODE_UNIFIED, MODE_SPLIT_BY_TYPE]
 
 
 class IrRfHubConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -40,6 +59,10 @@ class IrRfHubConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._discovered_data: dict[str, str | int] | None = None
+
+    @staticmethod
+    def async_get_options_flow(config_entry: ConfigEntry) -> IrRfHubOptionsFlow:
+        return IrRfHubOptionsFlow()
 
     async def async_step_user(self, user_input: dict | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -127,3 +150,29 @@ class IrRfHubConfigFlow(ConfigFlow, domain=DOMAIN):
 
         self._set_confirm_only()
         return self.async_show_form(step_id="hassio_confirm")
+
+
+class IrRfHubOptionsFlow(OptionsFlow):
+    """Single-field flow for the device-grouping display mode (see
+    const.py's MODE_* / device_grouping.py). Picking a new mode here
+    triggers __init__.py's update listener, which reloads the entry so
+    every entity's device_info is recomputed under the new mode.
+    """
+
+    async def async_step_init(self, user_input: dict | None = None) -> ConfigFlowResult:
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        current = self.config_entry.options.get(CONF_DEVICE_GROUPING, DEFAULT_DEVICE_GROUPING)
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_DEVICE_GROUPING, default=current): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=DEVICE_GROUPING_OPTIONS,
+                        translation_key=CONF_DEVICE_GROUPING,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="init", data_schema=schema)
