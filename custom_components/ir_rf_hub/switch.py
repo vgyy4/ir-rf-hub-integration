@@ -12,6 +12,7 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -43,6 +44,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         registry = er.async_get(hass)
         if registry.async_get(entity.entity_id) is not None:
             registry.async_remove(entity.entity_id)
+
+        # See button.py's matching block -- one HA Device per Command,
+        # shared with the sibling button entity, that HA never auto-
+        # removes on its own. Safe from both platforms: whichever runs
+        # second is the one that finds zero entities left.
+        device_registry = dr.async_get(hass)
+        device = device_registry.async_get_device(identifiers={(DOMAIN, command_id)})
+        if device is not None and not er.async_entries_for_device(registry, device.id, include_disabled_entities=True):
+            device_registry.async_remove_device(device.id)
 
     for command in coordinator.data.values():
         _add_new(command)

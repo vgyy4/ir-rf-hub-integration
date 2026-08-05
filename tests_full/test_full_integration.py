@@ -14,6 +14,7 @@ import json
 import pytest
 from aiohttp.test_utils import TestServer
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -321,6 +322,9 @@ async def test_deleted_command_removes_its_entities(hass):
         entry = await _setup_entry(hass, server, "secret-token")
         assert len(_entities_for(hass, entry)) == 4
 
+        device_registry = dr.async_get(hass)
+        assert device_registry.async_get_device(identifiers={(DOMAIN, "c2")}) is not None
+
         commands.pop()  # remove "Fan"
         for ws in app[WS_CLIENTS_KEY]:
             await ws.send_json({"type": "command.deleted", "data": {"command_id": "c2"}})
@@ -330,6 +334,12 @@ async def test_deleted_command_removes_its_entities(hass):
             if len(_entities_for(hass, entry)) == 2:
                 break
         assert len(_entities_for(hass, entry)) == 2
+
+        # entity.py groups the button+switch pair under one HA Device per
+        # Command -- removing the entities alone leaves a permanent
+        # zero-entity ghost device behind unless button.py/switch.py's
+        # _remove() also cleans up the now-empty device.
+        assert device_registry.async_get_device(identifiers={(DOMAIN, "c2")}) is None
 
 
 # -- unload --------------------------------------------------------------
