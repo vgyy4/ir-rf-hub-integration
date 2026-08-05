@@ -62,9 +62,17 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+          # Caches pip's downloaded/built wheels keyed on this file's hash
+          # (still versions unpinned -- see requirements.txt, deliberately
+          # so the daily schedule run above keeps testing against whatever
+          # is actually latest). Installing HA core is the slow part of
+          # this job; without this it re-downloads and rebuilds the whole
+          # dependency tree from scratch on every single run.
+          cache: pip
+          cache-dependency-path: tests_full/requirements.txt
 
       - name: Install test dependencies
-        run: pip install pytest-homeassistant-custom-component pytest-asyncio aiohttp
+        run: pip install -r tests_full/requirements.txt
 
       - name: Run full integration tests
         working-directory: tests_full
