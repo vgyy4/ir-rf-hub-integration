@@ -10,6 +10,7 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -44,6 +45,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         registry = er.async_get(hass)
         if registry.async_get(entity.entity_id) is not None:
             registry.async_remove(entity.entity_id)
+
+        # entity.py makes one HA Device per Command (identifiers=(DOMAIN,
+        # command_id)), shared by this button and its sibling switch. HA
+        # never auto-removes a device just because its entities are gone
+        # -- without this, every deleted command leaves a permanent
+        # zero-entity ghost device behind. Safe to run from both
+        # button.py and switch.py's _remove: whichever runs second is the
+        # one that actually finds zero entities left and does the removal.
+        device_registry = dr.async_get(hass)
+        device = device_registry.async_get_device(identifiers={(DOMAIN, command_id)})
+        if device is not None and not er.async_entries_for_device(registry, device.id, include_disabled_entities=True):
+            device_registry.async_remove_device(device.id)
 
     for command in coordinator.data.values():
         _add_new(command)
