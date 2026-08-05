@@ -15,6 +15,7 @@ import pytest
 from aiohttp.test_utils import TestServer
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ir_rf_hub.const import DOMAIN
@@ -90,6 +91,76 @@ async def test_config_flow_unreachable_host_shows_connect_error(hass):
     )
     assert result2["type"] is FlowResultType.FORM
     assert result2["errors"] == {"base": "cannot_connect"}
+
+
+def _hassio_discovery(host: str, port: int, token: str) -> HassioServiceInfo:
+    return HassioServiceInfo(
+        config={"host": host, "port": port, "token": token},
+        name="IR-RF Command Hub",
+        slug="local_ir_rf_hub",
+        uuid="test-uuid",
+    )
+
+
+async def test_config_flow_hassio_discovery_confirms_then_creates_entry(hass):
+    # The zero-typing path: the App announces itself to Supervisor, Core
+    # routes it straight to async_step_hassio -- no pairing_code field at
+    # all, just a confirm step.
+    app = make_app("secret-token", commands=[])
+    async with TestServer(app) as server:
+        discovery_info = _hassio_discovery(server.host, server.port, "secret-token")
+
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": "hassio"}, data=discovery_info
+        )
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "hassio_confirm"
+
+        result2 = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result2["type"] is FlowResultType.CREATE_ENTRY
+        assert result2["data"] == {"host": server.host, "port": server.port, "token": "secret-token"}
+
+
+async def test_config_flow_hassio_discovery_wrong_token_aborts(hass):
+    app = make_app("real-token", commands=[])
+    async with TestServer(app) as server:
+        discovery_info = _hassio_discovery(server.host, server.port, "wrong-token")
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": "hassio"}, data=discovery_info
+        )
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "invalid_auth"
+
+
+async def test_config_flow_hassio_discovery_unreachable_aborts(hass):
+    # Port 1 -- nothing listens there, connection should just fail.
+    discovery_info = _hassio_discovery("127.0.0.1", 1, "token")
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "hassio"}, data=discovery_info
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "cannot_connect"
+
+
+async def test_config_flow_hassio_discovery_already_configured_aborts(hass):
+    # _setup_entry() doesn't set unique_id (the other tests using it don't
+    # need duplicate-detection), so build the pre-existing entry directly
+    # with the same unique_id async_step_hassio derives (f"{host}:{port}"),
+    # and no need for a real fake server since the abort happens before
+    # any connectivity check.
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="127.0.0.1:9999",
+        data={"host": "127.0.0.1", "port": 9999, "token": "secret-token"},
+    )
+    entry.add_to_hass(hass)
+
+    discovery_info = _hassio_discovery("127.0.0.1", 9999, "secret-token")
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "hassio"}, data=discovery_info
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
 
 
 # -- entity setup ---------------------------------------------------------------
