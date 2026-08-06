@@ -14,7 +14,7 @@
   token} via pairing.py, which mirrors the App's security.py encoder.
 
 Both converge on the same connectivity+auth check before creating an
-entry -- see ARCHITECTURE.md's Pairing section.
+entry -- see README.md's "Pairing & re-pair behavior" section.
 """
 
 from __future__ import annotations

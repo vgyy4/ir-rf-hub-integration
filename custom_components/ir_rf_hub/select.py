@@ -14,65 +14,19 @@ import logging
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .api import CommandRecord, IrRfHubApiError, IrRfHubAuthError
-from .const import DOMAIN
-from .coordinator import SIGNAL_COMMAND_ADDED, SIGNAL_COMMAND_REMOVED, IrRfHubCoordinator
-from .entity import IrRfHubCommandEntity
+from .api import IrRfHubApiError, IrRfHubAuthError
+from .coordinator import IrRfHubCoordinator
+from .entity import IrRfHubCommandEntity, async_setup_command_entities
 
 logger = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    coordinator: IrRfHubCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities: dict[str, IrRfHubDeviceSelect] = {}
-
-    @callback
-    def _add_new(command: CommandRecord) -> None:
-        if command.id in entities:
-            return
-        entity = IrRfHubDeviceSelect(coordinator, command.id)
-        entities[command.id] = entity
-        async_add_entities([entity])
-
-    @callback
-    def _remove(command_id: str) -> None:
-        entity = entities.pop(command_id, None)
-        if entity is None or entity.entity_id is None:
-            return
-        # See button.py's matching block: explicit registry removal is
-        # what actually makes a deleted command's entities disappear for
-        # good, and device grouping is mode-dependent -- look the device
-        # up by the entity's own device_id and never remove the hub
-        # device. Safe to run from all three platforms independently,
-        # whichever runs last is the one that finds zero entities
-        # remaining.
-        registry = er.async_get(hass)
-        registry_entry = registry.async_get(entity.entity_id)
-        device_id = registry_entry.device_id if registry_entry is not None else None
-        if registry_entry is not None:
-            registry.async_remove(entity.entity_id)
-
-        if device_id is None:
-            return
-        device_registry = dr.async_get(hass)
-        device = device_registry.async_get(device_id)
-        if device is None or (DOMAIN, entry.entry_id) in device.identifiers:
-            return
-        if not er.async_entries_for_device(registry, device.id, include_disabled_entities=True):
-            device_registry.async_remove_device(device.id)
-
-    for command in coordinator.data.values():
-        _add_new(command)
-
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_COMMAND_ADDED, _add_new))
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_COMMAND_REMOVED, _remove))
+    async_setup_command_entities(hass, entry, async_add_entities, IrRfHubDeviceSelect)
 
 
 class IrRfHubDeviceSelect(IrRfHubCommandEntity, SelectEntity):

@@ -16,6 +16,17 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
+# The App is always on Supervisor's own internal network (see
+# ARCHITECTURE.md's Pairing section on the App side), so a slow response
+# here means the App is hung, not that it's a slow WAN request -- without
+# an explicit floor, a caller (a button press, a config-flow health check)
+# would otherwise hang on the aiohttp session's own default, which HA's
+# shared ClientSession doesn't set to anything short. Only applied to plain
+# request/response calls: the WS connection in async_listen_events is
+# meant to stay open indefinitely and already has its own liveness check
+# via `heartbeat=30`.
+_REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=10)
+
 
 class IrRfHubApiError(Exception):
     """Generic API error."""
@@ -60,7 +71,7 @@ class IrRfHubClient:
     async def async_report_discovered_devices(self, devices: list[dict]) -> None:
         try:
             async with self._session.post(
-                f"{self._base_url}/discovered-devices", headers=self._headers, json=devices
+                f"{self._base_url}/discovered-devices", headers=self._headers, json=devices, timeout=_REQUEST_TIMEOUT
             ) as resp:
                 await self._raise_for_status(resp)
         except aiohttp.ClientError as exc:
@@ -77,6 +88,7 @@ class IrRfHubClient:
                 f"{self._base_url}/commands/{command_id}/fire",
                 headers=self._headers,
                 json={"device_id": device_id} if device_id is not None else None,
+                timeout=_REQUEST_TIMEOUT,
             ) as resp:
                 await self._raise_for_status(resp)
         except aiohttp.ClientError as exc:
@@ -93,7 +105,9 @@ class IrRfHubClient:
 
     async def _get(self, path: str):
         try:
-            async with self._session.get(f"{self._base_url}{path}", headers=self._headers) as resp:
+            async with self._session.get(
+                f"{self._base_url}{path}", headers=self._headers, timeout=_REQUEST_TIMEOUT
+            ) as resp:
                 await self._raise_for_status(resp)
                 return await resp.json()
         except aiohttp.ClientError as exc:

@@ -14,13 +14,16 @@ import json
 import pytest
 from aiohttp.test_utils import TestServer
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.ir_rf_hub.const import CONF_DEVICE_GROUPING, DOMAIN, MODE_SPLIT_BY_TYPE, MODE_UNIFIED
-from fake_hub_server import FIRE_DEVICE_IDS_KEY, FIRED_KEY, WS_CLIENTS_KEY, make_app
+from custom_components.ir_rf_hub.diagnostics import async_get_config_entry_diagnostics
+from fake_hub_server import EXPECTED_TOKEN_KEY, FIRE_DEVICE_IDS_KEY, FIRED_KEY, WS_CLIENTS_KEY, make_app
 
 
 def _encode_pairing_code(host: str, port: int, token: str) -> str:
@@ -221,17 +224,30 @@ async def test_setup_creates_button_switch_and_select_grouped_under_one_device(h
         entry = await _setup_entry(hass, server, "secret-token")
 
         entities = _entities_for(hass, entry)
-        assert sorted(e.entity_id.split(".")[0] for e in entities) == ["button", "select", "switch"]
+        # "remote" is the odd one out: unlike button/select/switch it's a
+        # singleton (one per config entry, not one per Command) -- see
+        # remote.py's own docstring for why -- so it's checked separately
+        # below rather than folded into the per-command grouping assertion.
+        assert sorted(e.entity_id.split(".")[0] for e in entities) == ["button", "remote", "select", "switch"]
 
         button = next(e for e in entities if e.entity_id.startswith("button."))
         switch = next(e for e in entities if e.entity_id.startswith("switch."))
         select = next(e for e in entities if e.entity_id.startswith("select."))
+        remote = next(e for e in entities if e.entity_id.startswith("remote."))
         assert button.unique_id == f"{entry.entry_id}_c1_button"
         assert switch.unique_id == f"{entry.entry_id}_c1_switch"
         assert select.unique_id == f"{entry.entry_id}_c1_select"
-        # grouped under the same device
+        assert remote.unique_id == f"{entry.entry_id}_remote"
+        # grouped under the same per-command device ("separate" mode)
         assert button.device_id == switch.device_id == select.device_id
         assert button.device_id is not None
+        # the remote entity always lives on the shared hub device instead,
+        # regardless of the per-command device-grouping mode -- there's
+        # only one of it, so per-command grouping doesn't apply.
+        device_registry = dr.async_get(hass)
+        hub_device = device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
+        assert remote.device_id == hub_device.id
+        assert remote.device_id != button.device_id
 
         # "separate" mode: the device is already named after the command,
         # so the plain per-type suffix is enough -- has_entity_name
@@ -326,6 +342,50 @@ async def test_select_option_fires_the_command_with_chosen_device(hass):
         assert hass.states.get(select_entity_id).state == "Bedroom"
 
 
+async def test_remote_send_command_fires_named_commands_in_order(hass):
+    commands = [
+        {"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None},
+        {"id": "c2", "name": "AC On", "type": "ir", "default_device_id": None},
+    ]
+    app = make_app("secret-token", commands=commands)
+    async with TestServer(app) as server:
+        entry = await _setup_entry(hass, server, "secret-token")
+        remote_entity_id = next(
+            e.entity_id for e in _entities_for(hass, entry) if e.entity_id.startswith("remote.")
+        )
+
+        # One remote entity total, addressing both commands by name -- not
+        # one remote entity per command.
+        assert len([e for e in _entities_for(hass, entry) if e.entity_id.startswith("remote.")]) == 1
+
+        await hass.services.async_call(
+            "remote",
+            "send_command",
+            {"entity_id": remote_entity_id, "command": ["TV Power", "AC On"]},
+            blocking=True,
+        )
+        assert app[FIRED_KEY] == ["c1", "c2"]
+
+
+async def test_remote_send_command_rejects_an_unknown_name(hass):
+    commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}]
+    app = make_app("secret-token", commands=commands)
+    async with TestServer(app) as server:
+        entry = await _setup_entry(hass, server, "secret-token")
+        remote_entity_id = next(
+            e.entity_id for e in _entities_for(hass, entry) if e.entity_id.startswith("remote.")
+        )
+
+        with pytest.raises(HomeAssistantError):
+            await hass.services.async_call(
+                "remote",
+                "send_command",
+                {"entity_id": remote_entity_id, "command": ["Does Not Exist"]},
+                blocking=True,
+            )
+        assert app[FIRED_KEY] == []
+
+
 # -- live sync --------------------------------------------------------------
 
 
@@ -334,7 +394,8 @@ async def test_new_command_gets_entities_without_restart(hass):
     app = make_app("secret-token", commands=commands)
     async with TestServer(app) as server:
         entry = await _setup_entry(hass, server, "secret-token")
-        assert len(_entities_for(hass, entry)) == 3
+        # 3 per command (button/switch/select) + 1 singleton remote entity.
+        assert len(_entities_for(hass, entry)) == 4
 
         # Simulate a new command appearing on the App side and it
         # notifying over the same WS the coordinator is listening on.
@@ -344,9 +405,9 @@ async def test_new_command_gets_entities_without_restart(hass):
 
         for _ in range(50):
             await asyncio.sleep(0.1)
-            if len(_entities_for(hass, entry)) == 6:
+            if len(_entities_for(hass, entry)) == 7:
                 break
-        assert len(_entities_for(hass, entry)) == 6
+        assert len(_entities_for(hass, entry)) == 7
 
 
 async def test_deleted_command_removes_its_entities(hass):
@@ -357,7 +418,7 @@ async def test_deleted_command_removes_its_entities(hass):
     app = make_app("secret-token", commands=commands)
     async with TestServer(app) as server:
         entry = await _setup_entry(hass, server, "secret-token")
-        assert len(_entities_for(hass, entry)) == 6
+        assert len(_entities_for(hass, entry)) == 7  # 3 x 2 commands + 1 singleton remote entity
 
         device_registry = dr.async_get(hass)
         assert device_registry.async_get_device(identifiers={(DOMAIN, "c2")}) is not None
@@ -368,9 +429,9 @@ async def test_deleted_command_removes_its_entities(hass):
 
         for _ in range(50):
             await asyncio.sleep(0.1)
-            if len(_entities_for(hass, entry)) == 3:
+            if len(_entities_for(hass, entry)) == 4:
                 break
-        assert len(_entities_for(hass, entry)) == 3
+        assert len(_entities_for(hass, entry)) == 4  # 3 for "TV Power" + the remote entity, which never goes away
 
         # entity.py groups the button+switch+select trio under one HA
         # Device per Command -- removing the entities alone leaves a
@@ -378,6 +439,64 @@ async def test_deleted_command_removes_its_entities(hass):
         # button.py/switch.py/select.py's _remove() also cleans up the
         # now-empty device.
         assert device_registry.async_get_device(identifiers={(DOMAIN, "c2")}) is None
+
+
+async def test_auth_failure_during_live_resync_creates_a_repair_issue_and_clears_on_recovery(hass):
+    # Simulates the App getting reinstalled mid-session: it issues a fresh
+    # pairing token, so this integration's saved one starts getting 401s.
+    # Previously that vanished into a debug log inside async_listen_events'
+    # own retry loop with zero user-visible indication -- see
+    # coordinator.py's _async_full_resync.
+    commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}]
+    app = make_app("secret-token", commands=commands)
+    async with TestServer(app) as server:
+        entry = await _setup_entry(hass, server, "secret-token")
+        issue_registry = ir.async_get(hass)
+        issue_id = f"auth_failed_{entry.entry_id}"
+        assert issue_registry.async_get_issue(DOMAIN, issue_id) is None
+
+        app[EXPECTED_TOKEN_KEY] = "a-new-token-after-reinstall"
+        for ws in app[WS_CLIENTS_KEY]:
+            await ws.send_json({"type": "command.updated", "data": {"command_id": "c1"}})
+
+        for _ in range(50):
+            await asyncio.sleep(0.1)
+            if issue_registry.async_get_issue(DOMAIN, issue_id) is not None:
+                break
+        issue = issue_registry.async_get_issue(DOMAIN, issue_id)
+        assert issue is not None
+        assert issue.translation_key == "auth_failed"
+        assert issue.severity == ir.IssueSeverity.ERROR
+
+        # Recovery: re-pairing (or the token happening to match again)
+        # should clear the issue on the next successful resync, not leave
+        # a stale Repair card behind forever.
+        app[EXPECTED_TOKEN_KEY] = "secret-token"
+        for ws in app[WS_CLIENTS_KEY]:
+            await ws.send_json({"type": "command.updated", "data": {"command_id": "c1"}})
+
+        for _ in range(50):
+            await asyncio.sleep(0.1)
+            if issue_registry.async_get_issue(DOMAIN, issue_id) is None:
+                break
+        assert issue_registry.async_get_issue(DOMAIN, issue_id) is None
+
+
+async def test_diagnostics_redacts_token_and_lists_commands(hass):
+    commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": "d1"}]
+    app = make_app("secret-token", commands=commands)
+    async with TestServer(app) as server:
+        entry = await _setup_entry(hass, server, "secret-token")
+
+        diagnostics = await async_get_config_entry_diagnostics(hass, entry)
+
+        assert diagnostics["entry_data"]["token"] == "**REDACTED**"
+        assert diagnostics["entry_data"]["host"] == server.host  # not sensitive, not redacted
+        assert diagnostics["command_count"] == 1
+        assert diagnostics["commands"] == [
+            {"id": "c1", "name": "TV Power", "type": "ir", "has_default_device": True}
+        ]
+        assert diagnostics["last_update_success"] is True
 
 
 async def test_setup_prunes_ghost_devices_from_commands_deleted_before_this_fix_existed(hass):
@@ -451,7 +570,7 @@ async def test_changing_grouping_mode_reloads_and_regroups_devices(hass):
         assert hub_device is not None
 
         entities = _entities_for(hass, entry)
-        assert len(entities) == 3
+        assert len(entities) == 4  # button/switch/select for "TV Power" + the singleton remote entity
         assert all(e.device_id == hub_device.id for e in entities)
 
         # unified mode: the hub device's own name ("IR/RF Command Hub")
@@ -508,9 +627,12 @@ async def test_split_by_type_mode_groups_buttons_and_selects_separately_from_swi
             await ws.send_json({"type": "command.deleted", "data": {"command_id": "c1"}})
         for _ in range(50):
             await asyncio.sleep(0.1)
-            if not _entities_for(hass, entry):
+            if len(_entities_for(hass, entry)) == 1:
                 break
-        assert not _entities_for(hass, entry)
+        # Only the singleton remote entity survives -- it's never tied to
+        # any one command's lifecycle, unlike button/select/switch.
+        remaining = _entities_for(hass, entry)
+        assert [e.entity_id.split(".")[0] for e in remaining] == ["remote"]
         assert device_registry.async_get(buttons_device.id) is None
         assert device_registry.async_get(switches_device.id) is None
         # the hub device itself is never touched by this cleanup
