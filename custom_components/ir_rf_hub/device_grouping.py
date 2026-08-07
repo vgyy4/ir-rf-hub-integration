@@ -11,7 +11,7 @@ from __future__ import annotations
 from homeassistant.helpers.entity import DeviceInfo
 
 from .api import CommandRecord
-from .const import DOMAIN, MODE_SEPARATE, MODE_SPLIT_BY_TYPE, MODE_UNIFIED
+from .const import DOMAIN, HUB_TITLE, MODE_SEPARATE, MODE_SPLIT_BY_TYPE, MODE_UNIFIED
 
 # entity_kind "select" groups with "button" in split-by-type mode -- both
 # read as "trigger an action," unlike the switch's toggle-style state.
@@ -49,7 +49,7 @@ def device_info_for(
         return DeviceInfo(
             identifiers={(DOMAIN, device_id)},
             name=group_name,
-            manufacturer="IR/RF Hub",
+            manufacturer=HUB_TITLE,
             via_device=(DOMAIN, entry_id),
         )
 
@@ -57,7 +57,7 @@ def device_info_for(
     return DeviceInfo(
         identifiers={(DOMAIN, command_id)},
         name=name,
-        manufacturer="IR/RF Hub",
+        manufacturer=HUB_TITLE,
         model=model,
         via_device=(DOMAIN, entry_id),
     )

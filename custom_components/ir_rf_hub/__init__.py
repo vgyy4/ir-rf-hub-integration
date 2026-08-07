@@ -13,6 +13,7 @@ from .const import (
     CONF_TOKEN,
     DEFAULT_DEVICE_GROUPING,
     DOMAIN,
+    HUB_TITLE,
     MODE_SEPARATE,
     MODE_SPLIT_BY_TYPE,
 )
@@ -60,6 +61,16 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    # Entries created before the "Command" rename keep their original
+    # title forever otherwise -- ConfigFlow's title= only applies at
+    # creation, so an already-paired install would stay stuck on the old
+    # name even after updating this integration, with no obvious fix
+    # short of deleting and re-adding it. This self-heals it on the next
+    # setup instead, matching HUB_TITLE (the same string the device
+    # registry entries below and device_grouping.py already use).
+    if entry.title != HUB_TITLE:
+        hass.config_entries.async_update_entry(entry, title=HUB_TITLE)
+
     session = async_get_clientsession(hass)
     client = IrRfHubClient(session, entry.data[CONF_HOST], entry.data[CONF_PORT], entry.data[CONF_TOKEN])
 
@@ -89,8 +100,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
-        name="IR/RF Hub",
-        manufacturer="IR/RF Hub",
+        name=HUB_TITLE,
+        manufacturer=HUB_TITLE,
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

@@ -217,6 +217,24 @@ async def test_config_flow_manual_repair_refreshes_stale_token_on_existing_entry
 # -- entity setup ---------------------------------------------------------------
 
 
+async def test_setup_migrates_a_pre_rename_entry_title(hass):
+    # ConfigFlow's title= only applies at entry creation, so an install
+    # paired before the "Command" rename would otherwise keep the old
+    # title forever, even after updating -- see __init__.py's self-heal.
+    app = make_app("secret-token", commands=[])
+    async with TestServer(app) as server:
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            title="IR/RF Command Hub",
+            data={"host": server.host, "port": server.port, "token": "secret-token"},
+        )
+        entry.add_to_hass(hass)
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        assert entry.title == "IR/RF Hub"
+
+
 async def test_setup_creates_button_switch_and_select_grouped_under_one_device(hass):
     commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}]
     app = make_app("secret-token", commands=commands)

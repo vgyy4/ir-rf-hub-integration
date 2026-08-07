@@ -1,5 +1,10 @@
 DOMAIN = "ir_rf_hub"
 
+# The App's/integration's display name -- single source of truth so a
+# rename can't miss a spot again (config entry title, hub device
+# name/manufacturer, per-command device manufacturer all pull from this).
+HUB_TITLE = "IR/RF Hub"
+
 CONF_HOST = "host"
 CONF_PORT = "port"
 CONF_TOKEN = "token"
