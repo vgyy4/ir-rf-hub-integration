@@ -89,8 +89,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, entry.entry_id)},
-        name="IR/RF Command Hub",
-        manufacturer="IR/RF Command Hub",
+        name="IR/RF Hub",
+        manufacturer="IR/RF Hub",
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

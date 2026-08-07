@@ -1,5 +1,5 @@
-"""Diagnostics support -- Settings > Devices & services > IR/RF Command
-Hub > the entry's ⋮ menu > Download diagnostics. Useful for troubleshooting
+"""Diagnostics support -- Settings > Devices & services > IR/RF Hub
+> the entry's ⋮ menu > Download diagnostics. Useful for troubleshooting
 without asking someone to dig through logs or paste their pairing token.
 
 The token is the only thing worth redacting here: host/port are
