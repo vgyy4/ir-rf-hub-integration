@@ -41,6 +41,7 @@ from .const import (
     CONF_TOKEN,
     DEFAULT_DEVICE_GROUPING,
     DOMAIN,
+    HUB_TITLE,
     MODE_SEPARATE,
     MODE_SPLIT_BY_TYPE,
     MODE_UNIFIED,
@@ -85,7 +86,7 @@ class IrRfHubConfigFlow(ConfigFlow, domain=DOMAIN):
                     if result := await self._async_update_existing_entry(host, port, token):
                         return result
                     return self.async_create_entry(
-                        title="IR/RF Hub",
+                        title=HUB_TITLE,
                         data={CONF_HOST: host, CONF_PORT: port, CONF_TOKEN: token},
                     )
 
@@ -146,7 +147,7 @@ class IrRfHubConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_hassio_confirm(self, user_input: dict | None = None) -> ConfigFlowResult:
         if user_input is not None:
             assert self._discovered_data is not None
-            return self.async_create_entry(title="IR/RF Hub", data=self._discovered_data)
+            return self.async_create_entry(title=HUB_TITLE, data=self._discovered_data)
 
         self._set_confirm_only()
         return self.async_show_form(step_id="hassio_confirm")
