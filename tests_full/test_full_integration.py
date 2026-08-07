@@ -100,7 +100,7 @@ async def test_config_flow_unreachable_host_shows_connect_error(hass):
 def _hassio_discovery(host: str, port: int, token: str) -> HassioServiceInfo:
     return HassioServiceInfo(
         config={"host": host, "port": port, "token": token},
-        name="IR-RF Command Hub",
+        name="IR-RF Hub",
         slug="local_ir_rf_hub",
         uuid="test-uuid",
     )
@@ -573,13 +573,13 @@ async def test_changing_grouping_mode_reloads_and_regroups_devices(hass):
         assert len(entities) == 4  # button/switch/select for "TV Power" + the singleton remote entity
         assert all(e.device_id == hub_device.id for e in entities)
 
-        # unified mode: the hub device's own name ("IR/RF Command Hub")
+        # unified mode: the hub device's own name ("IR/RF Hub")
         # no longer disambiguates between commands sharing it, so each
         # entity's own name must be qualified with the command name --
         # otherwise every command's Button/Switch/Send via would be
         # identically named and indistinguishable on the device's page.
         button = next(e for e in entities if e.entity_id.startswith("button."))
-        assert hass.states.get(button.entity_id).attributes["friendly_name"] == "IR/RF Command Hub TV Power Button"
+        assert hass.states.get(button.entity_id).attributes["friendly_name"] == "IR/RF Hub TV Power Button"
 
 
 async def test_split_by_type_mode_groups_buttons_and_selects_separately_from_switches(hass):
