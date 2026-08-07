@@ -2,15 +2,15 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to IR/RF Command Hub",
-        "description": "Open the IR/RF Command Hub App -- the first time it starts, it shows a pairing code on a screen you can't dismiss until you pair.",
+        "title": "Connect to IR/RF Hub",
+        "description": "Open the IR/RF Hub App -- the first time it starts, it shows a pairing code on a screen you can't dismiss until you pair.",
         "data": {
           "pairing_code": "Pairing code"
         }
       },
       "hassio_confirm": {
-        "title": "IR/RF Command Hub",
-        "description": "Home Assistant found the IR/RF Command Hub App running and confirmed it's reachable. Submit to finish connecting -- no code to copy."
+        "title": "IR/RF Hub",
+        "description": "Home Assistant found the IR/RF Hub App running and confirmed it's reachable. Submit to finish connecting -- no code to copy."
       }
     },
     "error": {
@@ -27,7 +27,7 @@
   "options": {
     "step": {
       "init": {
-        "title": "IR/RF Command Hub",
+        "title": "IR/RF Hub",
         "description": "Choose how commands should be grouped into devices.",
         "data": {
           "device_grouping": "Device grouping"

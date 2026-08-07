@@ -1,6 +1,6 @@
 {
   "domain": "ir_rf_hub",
-  "name": "IR/RF Command Hub",
+  "name": "IR/RF Hub",
   "codeowners": ["@vgyy4"],
   "config_flow": true,
   "dependencies": ["zeroconf"],
@@ -9,5 +9,5 @@
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/vgyy4/ir-rf-hub-integration/issues",
   "requirements": [],
-  "version": "0.3.0"
+  "version": "0.3.1"
 }

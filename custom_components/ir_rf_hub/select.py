@@ -76,7 +76,7 @@ class IrRfHubDeviceSelect(IrRfHubCommandEntity, SelectEntity):
         try:
             await self.coordinator.client.async_fire_command(self._command_id, device_id=device_id)
         except IrRfHubAuthError as exc:
-            raise HomeAssistantError("IR/RF Command Hub rejected our pairing token -- reconfigure the integration") from exc
+            raise HomeAssistantError("IR/RF Hub rejected our pairing token -- reconfigure the integration") from exc
         except IrRfHubApiError as exc:
             raise HomeAssistantError(f"Could not fire command: {exc}") from exc
 

@@ -49,7 +49,7 @@ def device_info_for(
         return DeviceInfo(
             identifiers={(DOMAIN, device_id)},
             name=group_name,
-            manufacturer="IR/RF Command Hub",
+            manufacturer="IR/RF Hub",
             via_device=(DOMAIN, entry_id),
         )
 
@@ -57,7 +57,7 @@ def device_info_for(
     return DeviceInfo(
         identifiers={(DOMAIN, command_id)},
         name=name,
-        manufacturer="IR/RF Command Hub",
+        manufacturer="IR/RF Hub",
         model=model,
         via_device=(DOMAIN, entry_id),
     )

@@ -1,4 +1,4 @@
-# IR/RF Command Hub — Home Assistant integration
+# IR/RF Hub — Home Assistant integration
 
 > [!WARNING]
 > **This project is experimental.** It was built quickly and has not been
@@ -7,7 +7,7 @@
 > issue](https://github.com/vgyy4/ir-rf-hub-integration/issues) if
 > something breaks.
 
-Companion integration for the **IR/RF Command Hub** [App](https://github.com/vgyy4/ir-rf-hub). Connects to the
+Companion integration for the **IR/RF Hub** [App](https://github.com/vgyy4/ir-rf-hub). Connects to the
 App over your Home Assistant Supervisor's internal network and creates a
 `button` + `switch` + `select` entity trio for every command recorded in
 the App -- a button that fires it, a switch that fires-then-auto-resets
@@ -22,8 +22,8 @@ free way to build a short sequence/macro out of existing commands without
 a dedicated feature for it.
 
 By default each command's three entities are grouped under their own
-Device. An Options flow (Settings → Devices & services → IR/RF Command
-Hub → Configure) lets you switch to grouping everything under one shared
+Device. An Options flow (Settings → Devices & services → IR/RF Hub
+→ Configure) lets you switch to grouping everything under one shared
 hub Device instead, or splitting by button/select-vs-switch across two
 devices -- pick whichever matches how you want commands to show up in
 dashboards and areas. Changing it reloads the integration so every
@@ -38,8 +38,8 @@ container can't see them directly.
 
 1. Copy `custom_components/ir_rf_hub` into your Home Assistant `config/custom_components/` directory (or install via HACS once published there).
 2. Restart Home Assistant.
-3. The App announces itself to Supervisor as soon as it's running, so a "IR/RF Command Hub" **Discovered** card should appear under Settings → Devices & services within a minute or so -- click it, then Submit. No fields, nothing to copy.
-4. If it doesn't show up (App not running under Supervisor, or this integration installed after the App gave up re-announcing): Settings → Devices & services → Add integration → "IR/RF Command Hub", then open the App -- the first time it starts, it shows a pairing code on a screen you can't get past until you pair -- and paste that code into the single field in the setup form. The code encodes the App's internal host, port, and an auth token together, so no separate host/port entry is needed.
+3. The App announces itself to Supervisor as soon as it's running, so a "IR/RF Hub" **Discovered** card should appear under Settings → Devices & services within a minute or so -- click it, then Submit. No fields, nothing to copy.
+4. If it doesn't show up (App not running under Supervisor, or this integration installed after the App gave up re-announcing): Settings → Devices & services → Add integration → "IR/RF Hub", then open the App -- the first time it starts, it shows a pairing code on a screen you can't get past until you pair -- and paste that code into the single field in the setup form. The code encodes the App's internal host, port, and an auth token together, so no separate host/port entry is needed.
 
 ## Pairing & re-pair behavior
 
