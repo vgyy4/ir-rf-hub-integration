@@ -20,7 +20,7 @@ from .coordinator import IrRfHubCoordinator
 from .device_grouping import split_device_ids
 from .esphome_discovery import async_report_esphome_devices_forever
 
-PLATFORMS = ["button", "switch", "select"]
+PLATFORMS = ["button", "switch", "select", "remote"]
 
 
 def _async_prune_orphaned_command_devices(

@@ -43,5 +43,11 @@
         "split_by_type": "Two devices: Buttons and Switches"
       }
     }
+  },
+  "issues": {
+    "auth_failed": {
+      "title": "{title} rejected the pairing token",
+      "description": "The App's saved pairing token no longer works -- most likely it was reinstalled and issued a fresh one. Commands have stopped updating. Open the App to see its current pairing code, then go to Settings → Devices & services → {title} and reconfigure with it. This clears on its own once a resync succeeds again."
+    }
   }
 }

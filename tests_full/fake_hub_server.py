@@ -12,6 +12,11 @@ FIRED_KEY = web.AppKey("fired", list)
 FIRE_DEVICE_IDS_KEY = web.AppKey("fire_device_ids", dict)
 WS_CLIENTS_KEY = web.AppKey("ws_clients", list)
 DISCOVERED_REPORTS_KEY = web.AppKey("discovered_reports", list)
+# Mutable (unlike a closed-over parameter), so a test can flip it mid-run to
+# simulate the App reissuing a token (e.g. test_full_integration.py's
+# coordinator-auth-failure-creates-a-repair-issue test) without needing a
+# second server.
+EXPECTED_TOKEN_KEY = web.AppKey("expected_token", str)
 
 
 def make_app(
@@ -25,11 +30,12 @@ def make_app(
     app[FIRE_DEVICE_IDS_KEY] = {}
     app[WS_CLIENTS_KEY] = []
     app[DISCOVERED_REPORTS_KEY] = []
+    app[EXPECTED_TOKEN_KEY] = expected_token
     fire_status = fire_status or {}
     candidate_devices = candidate_devices or {}
 
     def _authorized(request: web.Request) -> bool:
-        return request.headers.get("Authorization") == f"Bearer {expected_token}"
+        return request.headers.get("Authorization") == f"Bearer {request.app[EXPECTED_TOKEN_KEY]}"
 
     async def health(request: web.Request) -> web.Response:
         if not _authorized(request):

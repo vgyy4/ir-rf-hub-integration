@@ -12,59 +12,17 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 
-from .api import CommandRecord, IrRfHubApiError, IrRfHubAuthError
-from .const import DEFAULT_SWITCH_RESET_DELAY_S, DOMAIN
-from .coordinator import SIGNAL_COMMAND_ADDED, SIGNAL_COMMAND_REMOVED, IrRfHubCoordinator
-from .entity import IrRfHubCommandEntity
+from .api import IrRfHubApiError, IrRfHubAuthError
+from .const import DEFAULT_SWITCH_RESET_DELAY_S
+from .coordinator import IrRfHubCoordinator
+from .entity import IrRfHubCommandEntity, async_setup_command_entities
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    coordinator: IrRfHubCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities: dict[str, IrRfHubSwitch] = {}
-
-    @callback
-    def _add_new(command: CommandRecord) -> None:
-        if command.id in entities:
-            return
-        entity = IrRfHubSwitch(coordinator, command.id)
-        entities[command.id] = entity
-        async_add_entities([entity])
-
-    @callback
-    def _remove(command_id: str) -> None:
-        entity = entities.pop(command_id, None)
-        if entity is None or entity.entity_id is None:
-            return
-        registry = er.async_get(hass)
-        registry_entry = registry.async_get(entity.entity_id)
-        device_id = registry_entry.device_id if registry_entry is not None else None
-        if registry_entry is not None:
-            registry.async_remove(entity.entity_id)
-
-        # See button.py's matching block -- device grouping is mode-
-        # dependent, so look it up by the entity's own device_id and
-        # never remove the hub device. Safe from all three platforms:
-        # whichever runs last is the one that finds zero entities left.
-        if device_id is None:
-            return
-        device_registry = dr.async_get(hass)
-        device = device_registry.async_get(device_id)
-        if device is None or (DOMAIN, entry.entry_id) in device.identifiers:
-            return
-        if not er.async_entries_for_device(registry, device.id, include_disabled_entities=True):
-            device_registry.async_remove_device(device.id)
-
-    for command in coordinator.data.values():
-        _add_new(command)
-
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_COMMAND_ADDED, _add_new))
-    entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_COMMAND_REMOVED, _remove))
+    async_setup_command_entities(hass, entry, async_add_entities, IrRfHubSwitch)
 
 
 class IrRfHubSwitch(IrRfHubCommandEntity, SwitchEntity):
