@@ -1,4 +1,4 @@
-"""Diagnostics support -- Settings > Devices & services > IR/RF Hub
+"""Diagnostics support: Settings > Devices & services > IR/RF Hub
 > the entry's ⋮ menu > Download diagnostics. Useful for troubleshooting
 without asking someone to dig through logs or paste their pairing token.
 

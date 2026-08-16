@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # The App is always on Supervisor's own internal network (see
 # ARCHITECTURE.md's Pairing section on the App side), so a slow response
-# here means the App is hung, not that it's a slow WAN request -- without
+# here means the App is hung, not that it's a slow WAN request: without
 # an explicit floor, a caller (a button press, a config-flow health check)
 # would otherwise hang on the aiohttp session's own default, which HA's
 # shared ClientSession doesn't set to anything short. Only applied to plain
@@ -33,7 +33,7 @@ class IrRfHubApiError(Exception):
 
 
 class IrRfHubAuthError(IrRfHubApiError):
-    """The bearer token was rejected -- the App was likely reinstalled and
+    """The bearer token was rejected: the App was likely reinstalled and
     issued a fresh pairing code."""
 
 
@@ -93,7 +93,7 @@ class IrRfHubClient:
                 await self._raise_for_status(resp)
         except aiohttp.ClientError as exc:
             # Covers connection-refused/DNS/timeout failures below the HTTP
-            # layer -- _raise_for_status only ever sees a response that
+            # layer: _raise_for_status only ever sees a response that
             # actually arrived. Without this, a plain aiohttp.ClientError
             # escapes uncaught past every `except IrRfHubApiError` in
             # config_flow.py/button.py/switch.py.
@@ -125,7 +125,7 @@ class IrRfHubClient:
     ) -> None:
         """Runs forever (until cancelled), reconnecting with backoff.
         Calls `on_reconnect` after every successful (re)connect so the
-        coordinator can do a full REST resync -- WS is the fast path, this
+        coordinator can do a full REST resync: WS is the fast path, this
         callback is the correctness backstop for anything missed while
         disconnected.
         """
@@ -142,7 +142,7 @@ class IrRfHubClient:
                             break
             except asyncio.CancelledError:
                 raise
-            except Exception:  # noqa: BLE001 -- any connection error, just retry
+            except Exception:  # noqa: BLE001: any connection error, just retry
                 logger.debug("ir_rf_hub event socket error, retrying in %.1fs", backoff, exc_info=True)
 
             await asyncio.sleep(backoff)

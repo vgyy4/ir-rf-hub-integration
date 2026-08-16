@@ -56,7 +56,7 @@ def make_app(
         try:
             payload = await request.json()
             device_id = (payload or {}).get("device_id")
-        except Exception:  # noqa: BLE001 -- a bare press posts no body at all
+        except Exception:  # noqa: BLE001: a bare press posts no body at all
             pass
         app[FIRE_DEVICE_IDS_KEY][command_id] = device_id
         status = fire_status.get(command_id, 204)

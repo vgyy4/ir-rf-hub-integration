@@ -1,12 +1,12 @@
 """Two ways into this flow:
 
-- async_step_hassio -- the normal path. The App announces itself to
+- async_step_hassio: the normal path. The App announces itself to
   Supervisor's Discovery API as soon as it has a pairing token (see its
   supervisor_discovery.py), which Home Assistant Core turns into a
   "Discovered" card here automatically: no code to copy, no field to
   fill in, just a confirm button. Mirrors the mechanism Music
   Assistant's own App+integration pair uses for the same problem.
-- async_step_user -- manual fallback for installs where that hand-off
+- async_step_user: manual fallback for installs where that hand-off
   can't happen: the App running outside Supervisor entirely (plain
   Docker, no SUPERVISOR_TOKEN), or this integration installed *after*
   the App already announced and gave up. Paste the pairing code shown
@@ -14,7 +14,7 @@
   token} via pairing.py, which mirrors the App's security.py encoder.
 
 Both converge on the same connectivity+auth check before creating an
-entry -- see README.md's "Pairing & re-pair behavior" section.
+entry: see README.md's "Pairing & re-pair behavior" section.
 """
 
 from __future__ import annotations
@@ -117,7 +117,7 @@ class IrRfHubConfigFlow(ConfigFlow, domain=DOMAIN):
         silently rejecting re-pairing. The App issues a fresh pairing
         token on every reinstall, while Supervisor keeps the add-on's
         internal hostname stable across a plain uninstall+reinstall of
-        the same add-on -- so re-pairing with the same host:port but a
+        the same add-on: so re-pairing with the same host:port but a
         new token is the normal "the App got reinstalled" case, not a
         duplicate to reject. Leaving the old token in place strands the
         user with a permanently-failing entry (coordinator setup keeps

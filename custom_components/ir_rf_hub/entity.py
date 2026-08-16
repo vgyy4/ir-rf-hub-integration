@@ -20,7 +20,7 @@ from .device_grouping import device_info_for
 class IrRfHubCommandEntity(CoordinatorEntity[IrRfHubCoordinator]):
     """Base for the button/switch/select trio on one command. How they're
     grouped into HA Devices is user-configurable via the integration's
-    options flow (see device_grouping.py) -- entity_kind is which of the
+    options flow (see device_grouping.py): entity_kind is which of the
     three this instance is, needed because "split by type" mode groups
     differently per kind.
     """
@@ -48,7 +48,7 @@ class IrRfHubCommandEntity(CoordinatorEntity[IrRfHubCoordinator]):
         In "unified"/"split_by_type" mode, many commands' entities share
         one device, so that plain suffix alone would be identical across
         every command's Button/Switch/Select and impossible to tell
-        apart in the device's entity list -- prefixing with the command
+        apart in the device's entity list: prefixing with the command
         name keeps every entity distinguishable regardless of mode.
         """
         if self._grouping_mode == MODE_SEPARATE:
@@ -81,7 +81,7 @@ def async_setup_command_entities(
     entity of `make_entity`'s type per Command, kept live-synced with
     SIGNAL_COMMAND_ADDED/REMOVED, with explicit entity-registry removal and
     mode-aware orphaned-device cleanup on delete. The three platforms only
-    ever differed in which entity class to construct -- this is that shared
+    ever differed in which entity class to construct: this is that shared
     wiring, extracted once.
     """
     coordinator: IrRfHubCoordinator = hass.data[DOMAIN][entry.entry_id]
@@ -101,7 +101,7 @@ def async_setup_command_entities(
         if entity is None or entity.entity_id is None:
             return
         # entity.async_remove() alone tears down the live entity/state but
-        # doesn't reliably purge the entity *registry* entry -- explicit
+        # doesn't reliably purge the entity *registry* entry: explicit
         # registry removal is what actually makes a deleted command's
         # entities disappear for good, not just go unavailable.
         registry = er.async_get(hass)

@@ -1,10 +1,10 @@
 """Holds the live command list and drives dynamic entity add/update/remove
-as the App's library changes. Push-driven (no polling interval) -- the App's
+as the App's library changes. Push-driven (no polling interval): the App's
 /api/ws tells us *something* changed, and rather than parsing which
 event type and doing a granular add/update/remove, we just do a full
 REST resync every time. The command list is small (dozens, not
 thousands), so this trades a marginally larger REST call for a
-meaningfully simpler, harder-to-get-wrong implementation -- no risk of a
+meaningfully simpler, harder-to-get-wrong implementation: no risk of a
 missed/duplicate event leaving an entity dangling. WS reconnect (handled
 inside IrRfHubClient.async_listen_events) triggers the same resync path,
 which is also what makes it the correctness backstop the design calls for.
@@ -54,19 +54,19 @@ class IrRfHubCoordinator(DataUpdateCoordinator[dict[str, CommandRecord]]):
             await self._async_full_resync()
 
     async def _async_full_resync(self) -> None:
-        # Reached from two unattended paths -- a WS event callback and the
-        # reconnect callback (see api.py's async_listen_events) -- both of
+        # Reached from two unattended paths: a WS event callback and the
+        # reconnect callback (see api.py's async_listen_events): both of
         # which run inside a `try: ... except Exception: log and retry`
         # loop with no human watching. Left uncaught, an auth failure here
         # (the App got reinstalled and issued a fresh token, most likely)
         # would just vanish into a debug log forever: commands silently
         # stop updating with zero indication anything is wrong. A Repair
         # issue is the whole point of surfacing it instead.
-        # Only IrRfHubAuthError gets special handling -- anything else
+        # Only IrRfHubAuthError gets special handling: anything else
         # (IrRfHubApiError, a plain connectivity problem) is deliberately
         # left to propagate exactly as before this Repair-issue support was
         # added: at initial setup that means async_setup_entry fails loudly
-        # (correct -- HA should know setup didn't work), and from the WS
+        # (correct: HA should know setup didn't work), and from the WS
         # event/reconnect callbacks it's caught by async_listen_events' own
         # broad retry loop already. Swallowing it here too would silently
         # turn a real connectivity failure at *startup* into "setup

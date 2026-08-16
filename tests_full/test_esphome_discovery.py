@@ -1,5 +1,5 @@
 """Exercises async_report_esphome_devices_forever's wiring against real
-Home Assistant core -- specifically that
+Home Assistant core: specifically that
 homeassistant.components.zeroconf.async_get_async_instance(hass) is a
 valid call and the loop correctly forwards whatever a browse cycle
 finds to the client.
@@ -9,7 +9,7 @@ real multicast discovery doesn't belong in a unit test (see the App-
 side tests_full's own equivalent: it never tests its own local mDNS
 browse either, only the merge logic around it). The shared-Zeroconf
 lookup itself (async_get_async_instance) is neutralized globally by
-conftest.py's autouse _no_real_zeroconf_instance fixture -- constructing
+conftest.py's autouse _no_real_zeroconf_instance fixture: constructing
 a *real* HaAsyncZeroconf turned out to corrupt hass's own teardown
 badly enough to crash *other*, unrelated tests, confirmed by CI.
 """
@@ -58,7 +58,7 @@ async def test_on_change_callback_is_compatible_with_real_signal_fire(monkeypatc
     """Regression test for the exact bug _browse_once's own comment
     documents: zeroconf's Signal.fire(**kwargs) invokes every registered
     handler by keyword (zeroconf=..., service_type=..., name=...,
-    state_change=...) -- see zeroconf/_services/__init__.py's Signal.fire
+    state_change=...): see zeroconf/_services/__init__.py's Signal.fire
     and browser.py's _fire_service_state_changed_event, which is exactly
     how a real AsyncServiceBrowser dispatches to the handlers it's given.
     _on_change's first parameter must therefore be named exactly
@@ -67,14 +67,14 @@ async def test_on_change_callback_is_compatible_with_real_signal_fire(monkeypatc
     whole, so a parameter-name regression here went uncaught until a real
     install hit it.
 
-    This fakes out AsyncServiceBrowser -- the same external-library
+    This fakes out AsyncServiceBrowser: the same external-library
     boundary the rest of this project fakes at (see the App-side
-    fake_esphome_server.py) -- with a stand-in that registers the real
+    fake_esphome_server.py): with a stand-in that registers the real
     handler onto a genuine zeroconf.Signal and fires it exactly like the
     real browser does, so this exercises the real library's calling
     convention rather than a mock's. Firing with `Removed` (not `Added`)
     deliberately skips _on_change's _resolve() branch, so no real mDNS
-    resolution I/O is needed -- this test is only about the call
+    resolution I/O is needed: this test is only about the call
     succeeding at all.
     """
     real_signal = Signal()

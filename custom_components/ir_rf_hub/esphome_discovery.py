@@ -5,9 +5,9 @@ POST /api/integration/discovered-devices.
 Why this lives here instead of the App just doing it itself: the App's
 container sits on Supervisor's isolated internal network, and whether it
 can actually see real LAN mDNS/multicast traffic depends on Supervisor's
-Multicast plugin reaching it -- not guaranteed for every install. Home
+Multicast plugin reaching it: not guaranteed for every install. Home
 Assistant Core (where this integration runs) has reliable zeroconf
-discovery regardless -- it's the same mechanism the built-in `esphome`
+discovery regardless: it's the same mechanism the built-in `esphome`
 integration itself relies on. So the integration browses independently
 using Core's *shared* Zeroconf instance (async_get_async_instance --
 never close a shared instance, HA Core owns its lifecycle) and reports
@@ -43,7 +43,7 @@ _RESOLVE_TIMEOUT_MS = 2000
 async def async_report_esphome_devices_forever(hass: HomeAssistant, client: IrRfHubClient) -> None:
     """Runs for the lifetime of the config entry (started via
     entry.async_create_background_task in __init__.py, which cancels it
-    automatically on unload) -- browse, report, sleep, repeat. Never lets
+    automatically on unload): browse, report, sleep, repeat. Never lets
     a failed cycle kill the loop; just retries next interval.
     """
     logger.info("ESPHome discovery: starting background browse (service %s, every %ss)", _SERVICE_TYPE, _BROWSE_INTERVAL_S)
@@ -56,7 +56,7 @@ async def async_report_esphome_devices_forever(hass: HomeAssistant, client: IrRf
             if devices:
                 await client.async_report_discovered_devices(devices)
                 logger.info("ESPHome discovery: reported %d device(s) to the App", len(devices))
-        except Exception:  # noqa: BLE001 -- background loop, one bad cycle shouldn't kill it
+        except Exception:  # noqa: BLE001: background loop, one bad cycle shouldn't kill it
             logger.warning("ESPHome discovery report cycle failed, will retry", exc_info=True)
         await asyncio.sleep(_BROWSE_INTERVAL_S)
 
@@ -81,12 +81,12 @@ async def _browse_once(zeroconf) -> list[dict]:
                 "port": info.port or 6053,
             }
 
-    # First param must be named exactly `zeroconf` -- the zeroconf
+    # First param must be named exactly `zeroconf`: the zeroconf
     # library's Signal.fire() invokes listeners with keyword arguments
     # matching this name; anything else raises
     # "got an unexpected keyword argument 'zeroconf'" (confirmed by a
     # real install's logs, since this went uncaught by every test here
-    # -- none of them exercise a real Signal.fire() call).
+    #: none of them exercise a real Signal.fire() call).
     def _on_change(zeroconf, service_type, name, state_change) -> None:  # noqa: ANN001
         if state_change is ServiceStateChange.Added:
             pending.add(asyncio.ensure_future(_resolve(name)))

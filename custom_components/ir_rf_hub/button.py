@@ -1,6 +1,6 @@
 """One ButtonEntity per Command. async_press fires it; the native
 'Button pressed' automation trigger and any dashboard button card work
-automatically since this is a stock ButtonEntity -- no custom trigger
+automatically since this is a stock ButtonEntity: no custom trigger
 platform needed.
 """
 
@@ -34,7 +34,7 @@ class IrRfHubButton(IrRfHubCommandEntity, ButtonEntity):
         try:
             await self.coordinator.client.async_fire_command(self._command_id)
         except IrRfHubAuthError as exc:
-            raise HomeAssistantError("IR/RF Hub rejected our pairing token -- reconfigure the integration") from exc
+            raise HomeAssistantError("IR/RF Hub rejected our pairing token: reconfigure the integration") from exc
         except IrRfHubApiError as exc:
             # Deliberately loud: a button press with no human present to
             # ask "which ESP?" (e.g. this command has no default device)

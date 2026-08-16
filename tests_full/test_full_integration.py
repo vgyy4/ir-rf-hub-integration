@@ -1,6 +1,6 @@
 """End-to-end tests against real Home Assistant core: config flow, entity
 creation/grouping, button press, switch turn_on/auto-reset, and live sync
-as commands change on the App side -- everything the top-level tests/
+as commands change on the App side: everything the top-level tests/
 suite explicitly couldn't cover without installing HA core. Runs only in
 GitHub Actions' cloud runners (see ../.github/workflows/ci.yaml).
 """
@@ -47,7 +47,7 @@ def _entities_for(hass, entry: MockConfigEntry) -> list:
     return [e for e in registry.entities.values() if e.config_entry_id == entry.entry_id]
 
 
-# -- config flow --------------------------------------------------------------
+#: config flow --------------------------------------------------------------
 
 
 async def test_config_flow_valid_pairing_code_creates_entry(hass):
@@ -87,7 +87,7 @@ async def test_config_flow_wrong_token_shows_auth_error(hass):
 
 
 async def test_config_flow_unreachable_host_shows_connect_error(hass):
-    # Port 1 -- nothing listens there, connection should just fail.
+    # Port 1: nothing listens there, connection should just fail.
     code = _encode_pairing_code("127.0.0.1", 1, "token")
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
     result2 = await hass.config_entries.flow.async_configure(
@@ -108,7 +108,7 @@ def _hassio_discovery(host: str, port: int, token: str) -> HassioServiceInfo:
 
 async def test_config_flow_hassio_discovery_confirms_then_creates_entry(hass):
     # The zero-typing path: the App announces itself to Supervisor, Core
-    # routes it straight to async_step_hassio -- no pairing_code field at
+    # routes it straight to async_step_hassio: no pairing_code field at
     # all, just a confirm step.
     app = make_app("secret-token", commands=[])
     async with TestServer(app) as server:
@@ -137,7 +137,7 @@ async def test_config_flow_hassio_discovery_wrong_token_aborts(hass):
 
 
 async def test_config_flow_hassio_discovery_unreachable_aborts(hass):
-    # Port 1 -- nothing listens there, connection should just fail.
+    # Port 1: nothing listens there, connection should just fail.
     discovery_info = _hassio_discovery("127.0.0.1", 1, "token")
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": "hassio"}, data=discovery_info
@@ -151,7 +151,7 @@ async def test_config_flow_hassio_discovery_refreshes_stale_token_on_existing_en
     # internal hostname stable across a plain uninstall+reinstall (so
     # unique_id is unchanged), but the App issued a fresh pairing token.
     # The old behavior (_abort_if_unique_id_configured) left the existing
-    # entry's stale token in place forever -- confirmed on a real install
+    # entry's stale token in place forever: confirmed on a real install
     # as IrRfHubAuthError on every coordinator setup, with no obvious fix
     # short of manually deleting and re-adding the integration.
     app = make_app("new-token-after-reinstall", commands=[])
@@ -214,13 +214,13 @@ async def test_config_flow_manual_repair_refreshes_stale_token_on_existing_entry
         assert entry.data == {"host": server.host, "port": server.port, "token": "new-token-after-reinstall"}
 
 
-# -- entity setup ---------------------------------------------------------------
+#: entity setup ---------------------------------------------------------------
 
 
 async def test_setup_migrates_a_pre_rename_entry_title(hass):
     # ConfigFlow's title= only applies at entry creation, so an install
     # paired before the "Command" rename would otherwise keep the old
-    # title forever, even after updating -- see __init__.py's self-heal.
+    # title forever, even after updating: see __init__.py's self-heal.
     app = make_app("secret-token", commands=[])
     async with TestServer(app) as server:
         entry = MockConfigEntry(
@@ -243,8 +243,8 @@ async def test_setup_creates_button_switch_and_select_grouped_under_one_device(h
 
         entities = _entities_for(hass, entry)
         # "remote" is the odd one out: unlike button/select/switch it's a
-        # singleton (one per config entry, not one per Command) -- see
-        # remote.py's own docstring for why -- so it's checked separately
+        # singleton (one per config entry, not one per Command): see
+        # remote.py's own docstring for why: so it's checked separately
         # below rather than folded into the per-command grouping assertion.
         assert sorted(e.entity_id.split(".")[0] for e in entities) == ["button", "remote", "select", "switch"]
 
@@ -260,7 +260,7 @@ async def test_setup_creates_button_switch_and_select_grouped_under_one_device(h
         assert button.device_id == switch.device_id == select.device_id
         assert button.device_id is not None
         # the remote entity always lives on the shared hub device instead,
-        # regardless of the per-command device-grouping mode -- there's
+        # regardless of the per-command device-grouping mode: there's
         # only one of it, so per-command grouping doesn't apply.
         device_registry = dr.async_get(hass)
         hub_device = device_registry.async_get_device(identifiers={(DOMAIN, entry.entry_id)})
@@ -268,14 +268,14 @@ async def test_setup_creates_button_switch_and_select_grouped_under_one_device(h
         assert remote.device_id != button.device_id
 
         # "separate" mode: the device is already named after the command,
-        # so the plain per-type suffix is enough -- has_entity_name
+        # so the plain per-type suffix is enough: has_entity_name
         # combines it with the device name for the full friendly_name.
         assert hass.states.get(button.entity_id).attributes["friendly_name"] == "TV Power Button"
         assert hass.states.get(switch.entity_id).attributes["friendly_name"] == "TV Power Switch"
         assert hass.states.get(select.entity_id).attributes["friendly_name"] == "TV Power Send via"
 
 
-# -- firing commands --------------------------------------------------------------
+#: firing commands --------------------------------------------------------------
 
 
 async def test_button_press_fires_the_command(hass):
@@ -308,7 +308,7 @@ async def test_switch_turn_on_fires_then_resets_to_off(hass):
         assert app[FIRED_KEY] == ["c1"]
         assert hass.states.get(switch_entity_id).state == "on"
 
-        # DEFAULT_SWITCH_RESET_DELAY_S is 1.0s -- wait past it for the
+        # DEFAULT_SWITCH_RESET_DELAY_S is 1.0s: wait past it for the
         # auto-reset, then let HA process the resulting state write.
         for _ in range(30):
             await asyncio.sleep(0.1)
@@ -326,7 +326,7 @@ async def test_button_press_without_default_device_raises(hass):
             e.entity_id for e in _entities_for(hass, entry) if e.entity_id.startswith("button.")
         )
 
-        with pytest.raises(Exception):  # noqa: B017 -- HomeAssistantError, avoid importing just for this
+        with pytest.raises(Exception):  # noqa: B017: HomeAssistantError, avoid importing just for this
             await hass.services.async_call(
                 "button", "press", {"entity_id": button_entity_id}, blocking=True
             )
@@ -372,7 +372,7 @@ async def test_remote_send_command_fires_named_commands_in_order(hass):
             e.entity_id for e in _entities_for(hass, entry) if e.entity_id.startswith("remote.")
         )
 
-        # One remote entity total, addressing both commands by name -- not
+        # One remote entity total, addressing both commands by name: not
         # one remote entity per command.
         assert len([e for e in _entities_for(hass, entry) if e.entity_id.startswith("remote.")]) == 1
 
@@ -404,7 +404,7 @@ async def test_remote_send_command_rejects_an_unknown_name(hass):
         assert app[FIRED_KEY] == []
 
 
-# -- live sync --------------------------------------------------------------
+#: live sync --------------------------------------------------------------
 
 
 async def test_new_command_gets_entities_without_restart(hass):
@@ -452,7 +452,7 @@ async def test_deleted_command_removes_its_entities(hass):
         assert len(_entities_for(hass, entry)) == 4  # 3 for "TV Power" + the remote entity, which never goes away
 
         # entity.py groups the button+switch+select trio under one HA
-        # Device per Command -- removing the entities alone leaves a
+        # Device per Command: removing the entities alone leaves a
         # permanent zero-entity ghost device behind unless
         # button.py/switch.py/select.py's _remove() also cleans up the
         # now-empty device.
@@ -463,7 +463,7 @@ async def test_auth_failure_during_live_resync_creates_a_repair_issue_and_clears
     # Simulates the App getting reinstalled mid-session: it issues a fresh
     # pairing token, so this integration's saved one starts getting 401s.
     # Previously that vanished into a debug log inside async_listen_events'
-    # own retry loop with zero user-visible indication -- see
+    # own retry loop with zero user-visible indication: see
     # coordinator.py's _async_full_resync.
     commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}]
     app = make_app("secret-token", commands=commands)
@@ -543,7 +543,7 @@ async def test_setup_prunes_ghost_devices_from_commands_deleted_before_this_fix_
         assert device_registry.async_get_device(identifiers={(DOMAIN, "c1")}) is not None
 
 
-# -- device grouping options --------------------------------------------------------------
+#: device grouping options --------------------------------------------------------------
 
 
 async def test_options_flow_shows_current_mode_and_saves_new_one(hass):
@@ -565,7 +565,7 @@ async def test_options_flow_shows_current_mode_and_saves_new_one(hass):
 
 async def test_changing_grouping_mode_reloads_and_regroups_devices(hass):
     # No add_update_listener means HA silently does nothing on an options
-    # change -- this exercises the full path, not just that the option
+    # change: this exercises the full path, not just that the option
     # value got saved.
     commands = [{"id": "c1", "name": "TV Power", "type": "ir", "default_device_id": None}]
     app = make_app("secret-token", commands=commands)
@@ -647,7 +647,7 @@ async def test_split_by_type_mode_groups_buttons_and_selects_separately_from_swi
             await asyncio.sleep(0.1)
             if len(_entities_for(hass, entry)) == 1:
                 break
-        # Only the singleton remote entity survives -- it's never tied to
+        # Only the singleton remote entity survives: it's never tied to
         # any one command's lifecycle, unlike button/select/switch.
         remaining = _entities_for(hass, entry)
         assert [e.entity_id.split(".")[0] for e in remaining] == ["remote"]
@@ -658,7 +658,7 @@ async def test_split_by_type_mode_groups_buttons_and_selects_separately_from_swi
         assert registry.async_get(button.entity_id) is None
 
 
-# -- unload --------------------------------------------------------------
+#: unload --------------------------------------------------------------
 
 
 async def test_unload_removes_entity_states_cleanly(hass):
@@ -676,7 +676,7 @@ async def test_unload_removes_entity_states_cleanly(hass):
 
         # HA's platform unload deliberately keeps the entity registry entry
         # (so a reload doesn't churn history/customizations) and marks the
-        # state unavailable rather than deleting it outright -- both are
+        # state unavailable rather than deleting it outright: both are
         # acceptable "cleanly unloaded" outcomes, not just a None state.
         state = hass.states.get(button_entity_id)
         assert state is None or state.state == "unavailable"

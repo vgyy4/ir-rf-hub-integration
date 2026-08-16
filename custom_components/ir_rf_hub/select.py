@@ -1,5 +1,5 @@
 """One SelectEntity per Command, alongside the button/switch pair in
-button.py/switch.py -- picking an option fires the command through that
+button.py/switch.py: picking an option fires the command through that
 specific ESP device. Neither a bare button press nor a switch turn_on
 has any way to expose "which device" as a choice; this does, and since
 select.select_option is a standard HA service every select entity
@@ -46,7 +46,7 @@ class IrRfHubDeviceSelect(IrRfHubCommandEntity, SelectEntity):
 
     async def _async_refresh_options(self) -> None:
         """Fetched once when the entity is added, not kept continuously
-        live -- add or remove an ESP device afterward and this won't
+        live: add or remove an ESP device afterward and this won't
         notice until the integration reloads. The App's candidate-
         devices endpoint already restricts this to devices with a
         transmitter matching the command's IR/RF type, same as the
@@ -76,7 +76,7 @@ class IrRfHubDeviceSelect(IrRfHubCommandEntity, SelectEntity):
         try:
             await self.coordinator.client.async_fire_command(self._command_id, device_id=device_id)
         except IrRfHubAuthError as exc:
-            raise HomeAssistantError("IR/RF Hub rejected our pairing token -- reconfigure the integration") from exc
+            raise HomeAssistantError("IR/RF Hub rejected our pairing token: reconfigure the integration") from exc
         except IrRfHubApiError as exc:
             raise HomeAssistantError(f"Could not fire command: {exc}") from exc
 
