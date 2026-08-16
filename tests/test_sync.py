@@ -1,4 +1,4 @@
-"""Tests custom_components/ir_rf_hub/sync.py -- pure set-diff logic, zero
+"""Tests custom_components/ir_rf_hub/sync.py: pure set-diff logic, zero
 HA imports."""
 
 from __future__ import annotations

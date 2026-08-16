@@ -1,4 +1,4 @@
-"""Tests custom_components/ir_rf_hub/pairing.py -- deliberately has zero
+"""Tests custom_components/ir_rf_hub/pairing.py: deliberately has zero
 Home Assistant imports (see that module's docstring), so this file needs
 nothing beyond the standard library plus pytest.
 """
@@ -32,7 +32,7 @@ def test_round_trip():
 
 def test_round_trip_survives_missing_base64_padding():
     # base64url without '=' padding is exactly what the App emits
-    # (rstrip("=")) -- confirm the decoder's padding math is correct for
+    # (rstrip("=")): confirm the decoder's padding math is correct for
     # every possible input length, not just one lucky case.
     for token_len in range(1, 8):
         code = _encode("host", 1, "t" * token_len)

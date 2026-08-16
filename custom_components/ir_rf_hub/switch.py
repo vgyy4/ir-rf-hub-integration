@@ -1,5 +1,5 @@
 """One self-resetting SwitchEntity per Command, alongside the ButtonEntity
-in button.py -- an explicit user decision to have both, even though the
+in button.py: an explicit user decision to have both, even though the
 native "Button pressed" trigger alone would suffice for automations.
 Turning it on fires the command, then it resets back to off shortly after
 the fire call resolves, so it reads as a momentary trigger rather than a
@@ -41,7 +41,7 @@ class IrRfHubSwitch(IrRfHubCommandEntity, SwitchEntity):
         try:
             await self.coordinator.client.async_fire_command(self._command_id)
         except IrRfHubAuthError as exc:
-            raise HomeAssistantError("IR/RF Hub rejected our pairing token -- reconfigure the integration") from exc
+            raise HomeAssistantError("IR/RF Hub rejected our pairing token: reconfigure the integration") from exc
         except IrRfHubApiError as exc:
             raise HomeAssistantError(f"Could not fire command: {exc}") from exc
 
@@ -61,7 +61,7 @@ class IrRfHubSwitch(IrRfHubCommandEntity, SwitchEntity):
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
-        # Momentary by design -- turning off manually just cancels the
+        # Momentary by design: turning off manually just cancels the
         # auto-reset early, it never fires the command again.
         self._attr_is_on = False
         self.async_write_ha_state()

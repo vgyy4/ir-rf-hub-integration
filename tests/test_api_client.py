@@ -1,4 +1,4 @@
-"""Tests custom_components/ir_rf_hub/api.py -- imported via conftest.py's
+"""Tests custom_components/ir_rf_hub/api.py: imported via conftest.py's
 sys.path shim (bare `import api`), no Home Assistant involved. Runs
 against a real aiohttp HTTP+WS server (fake_hub_server.py), not mocks, so
 this exercises the actual wire behavior (headers, status codes, WS
@@ -62,7 +62,7 @@ async def test_fire_command_error_status_raises_api_error():
         client = IrRfHubClient(session, server.host, server.port, "secret-token")
         with pytest.raises(IrRfHubApiError):
             await client.async_fire_command("c1")
-        # the request still reached the server -- this is a rejected
+        # the request still reached the server: this is a rejected
         # fire (e.g. no default device), not a connection failure
         assert app[FIRED_KEY] == ["c1"]
 

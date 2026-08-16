@@ -32,7 +32,7 @@ def _async_prune_orphaned_command_devices(
     button.py/switch.py/select.py's SIGNAL_COMMAND_REMOVED handler
     started also removing the device (or from that live path being
     missed for any other reason, e.g. the App unreachable at the exact
-    moment of deletion) -- runs against every existing entry on every
+    moment of deletion): runs against every existing entry on every
     setup, so it self-heals regardless of when the fix actually landed
     for a given install. Also mode-aware: switching the device-grouping
     option leaves the *old* mode's devices behind (a per-command device
@@ -55,14 +55,14 @@ def _async_prune_orphaned_command_devices(
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
     # HA does not reload an entry on its own just because options
-    # changed -- without this, picking a new device-grouping mode in the
+    # changed: without this, picking a new device-grouping mode in the
     # options flow would silently do nothing until the next restart.
     await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Entries created before the "Command" rename keep their original
-    # title forever otherwise -- ConfigFlow's title= only applies at
+    # title forever otherwise: ConfigFlow's title= only applies at
     # creation, so an already-paired install would stay stuck on the old
     # name even after updating this integration, with no obvious fix
     # short of deleting and re-adding it. This self-heals it on the next
@@ -83,7 +83,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Best-effort: lets the App discover ESPHome devices for its "add a
     # device" UI via Home Assistant Core's reliable zeroconf instead of
-    # its own (not always reachable) local mDNS -- see
+    # its own (not always reachable) local mDNS: see
     # esphome_discovery.py. Tied to the entry's lifecycle, so it's
     # cancelled automatically on unload.
     entry.async_create_background_task(
@@ -93,7 +93,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     # The umbrella "hub" device every per-command device nests under via
-    # via_device (see entity.py) -- must actually exist in the registry
+    # via_device (see entity.py): must actually exist in the registry
     # before any entity references it, or HA logs a warning today and will
     # hard-fail in 2025.12.0.
     device_registry = dr.async_get(hass)

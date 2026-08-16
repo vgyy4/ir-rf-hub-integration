@@ -52,7 +52,7 @@ jobs:
     name: Full integration tests (real Home Assistant core)
     runs-on: ubuntu-latest
     # This is the one place Home Assistant core is installed for this
-    # project -- deliberately only here, in a GitHub-hosted cloud runner,
+    # project: deliberately only here, in a GitHub-hosted cloud runner,
     # never on a contributor's own machine (see tests_full/conftest.py).
     # Covers everything tests/ structurally can't: the actual ConfigFlow,
     # DataUpdateCoordinator, and entity platform classes.
@@ -63,7 +63,7 @@ jobs:
         with:
           python-version: "3.13"
           # Caches pip's downloaded/built wheels keyed on this file's hash
-          # (still versions unpinned -- see requirements.txt, deliberately
+          # (still versions unpinned: see requirements.txt, deliberately
           # so the daily schedule run above keeps testing against whatever
           # is actually latest). Installing HA core is the slow part of
           # this job; without this it re-downloads and rebuilds the whole
@@ -77,7 +77,7 @@ jobs:
       - name: Run full integration tests
         working-directory: tests_full
         # -n auto (pytest-xdist): each test gets its own fresh `hass`
-        # fixture (a full HomeAssistant instance -- real per-test setup
+        # fixture (a full HomeAssistant instance: real per-test setup
         # cost, not something to optimize away), so wall-clock time is
         # dominated by that fixed per-test overhead rather than by test
         # logic. Parallelizing across worker processes is the standard

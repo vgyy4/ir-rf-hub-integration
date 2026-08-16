@@ -1,6 +1,6 @@
 """Pairing code decoding, split out from config_flow.py so it has zero
 Home Assistant imports and can be unit-tested without installing HA core.
-Mirrors the App's security.py encode_pairing_code -- kept as an
+Mirrors the App's security.py encode_pairing_code: kept as an
 independent reimplementation (not a cross-import) since the App and this
 integration are deliberately separate deployables.
 """

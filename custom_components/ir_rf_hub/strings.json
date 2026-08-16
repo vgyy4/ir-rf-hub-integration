@@ -3,24 +3,24 @@
     "step": {
       "user": {
         "title": "Connect to IR/RF Hub",
-        "description": "Open the IR/RF Hub App -- the first time it starts, it shows a pairing code on a screen you can't dismiss until you pair.",
+        "description": "Open the IR/RF Hub App: the first time it starts, it shows a pairing code on a screen you can't dismiss until you pair.",
         "data": {
           "pairing_code": "Pairing code"
         }
       },
       "hassio_confirm": {
         "title": "IR/RF Hub",
-        "description": "Home Assistant found the IR/RF Hub App running and confirmed it's reachable. Submit to finish connecting -- no code to copy."
+        "description": "Home Assistant found the IR/RF Hub App running and confirmed it's reachable. Submit to finish connecting: no code to copy."
       }
     },
     "error": {
       "invalid_code": "That doesn't look like a valid pairing code. Open the App again to see the current one.",
-      "invalid_auth": "The App rejected this pairing code. It may have been regenerated -- copy a fresh one.",
+      "invalid_auth": "The App rejected this pairing code. It may have been regenerated: copy a fresh one.",
       "cannot_connect": "Could not reach the App. Make sure it's running and try again."
     },
     "abort": {
       "already_configured": "This App is already connected.",
-      "invalid_auth": "The App rejected the pairing token it announced. It may have been regenerated -- open the App to get a fresh one and add the integration manually.",
+      "invalid_auth": "The App rejected the pairing token it announced. It may have been regenerated: open the App to get a fresh one and add the integration manually.",
       "cannot_connect": "Found the App but couldn't reach it. Make sure it's running and try again."
     }
   },
@@ -47,7 +47,7 @@
   "issues": {
     "auth_failed": {
       "title": "{title} rejected the pairing token",
-      "description": "The App's saved pairing token no longer works -- most likely it was reinstalled and issued a fresh one. Commands have stopped updating. Open the App to see its current pairing code, then go to Settings → Devices & services → {title} and reconfigure with it. This clears on its own once a resync succeeds again."
+      "description": "The App's saved pairing token no longer works: most likely it was reinstalled and issued a fresh one. Commands have stopped updating. Open the App to see its current pairing code, then go to Settings → Devices & services → {title} and reconfigure with it. This clears on its own once a resync succeeds again."
     }
   }
 }

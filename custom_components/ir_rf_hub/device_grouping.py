@@ -13,7 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from .api import CommandRecord
 from .const import DOMAIN, HUB_TITLE, MODE_SEPARATE, MODE_SPLIT_BY_TYPE, MODE_UNIFIED
 
-# entity_kind "select" groups with "button" in split-by-type mode -- both
+# entity_kind "select" groups with "button" in split-by-type mode: both
 # read as "trigger an action," unlike the switch's toggle-style state.
 _SPLIT_GROUP_FOR_KIND = {"button": "buttons", "select": "buttons", "switch": "switches"}
 
@@ -38,7 +38,7 @@ def device_info_for(
 
     if mode == MODE_UNIFIED:
         # Reuse the hub device itself (always pre-created in
-        # __init__.py) rather than a new identifier -- "unified" means
+        # __init__.py) rather than a new identifier: "unified" means
         # everything nests under the one device the user already sees.
         return DeviceInfo(identifiers={(DOMAIN, entry_id)})
 
