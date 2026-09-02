@@ -1,11 +1,5 @@
 # IR/RF Hub: Home Assistant integration
 
-> [!WARNING]
-> **This project is experimental.** It was built quickly and has not been
-> verified against a wide range of setups; the pairing mechanism and data
-> it exposes may change without notice between versions. Please [open an
-> issue](https://github.com/vgyy4/ir-rf-hub-integration/issues) if
-> something breaks.
 
 Companion integration for the **IR/RF Hub** [App](https://github.com/vgyy4/ir-rf-hub). Connects to the
 App over your Home Assistant Supervisor's internal network and creates a
